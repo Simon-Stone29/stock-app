@@ -204,31 +204,42 @@ async function main() {
   for (const [user_id, userPicks] of Object.entries(byUser)) {
     let weeklyReturn = 0;
 
-    for (const pick of userPicks) {
-      const prices = priceMap[pick.symbol];
-      if (!prices || prices.open === 0) continue;
+  for (const pick of userPicks) {
+    const prices = priceMap[pick.symbol];
+    if (!prices || prices.open === 0) continue;
 
-      const stockReturn = (prices.close - prices.open) / prices.open;
-      weeklyReturn += stockReturn * (pick.percentage / 100);
-    }
-
-    const delta = weeklyReturn * SENSITIVITY;
-    const newScore = 1000 + delta;
-
-    await supabase.from("scores").upsert(
-      {
-        user_id,
-        week_start: WEEK_START,
-        competence_score: newScore,
-        leaderboard_ranking: null,
-      },
-      { onConflict: "user_id,week_start" }
-    );
-
-    console.log(
-      `  ${user_id}: ${(weeklyReturn * 100).toFixed(2)}% return → score ${newScore.toFixed(1)}`
-    );
+    const stockReturn = (prices.close - prices.open) / prices.open;
+    weeklyReturn += stockReturn * (pick.percentage / 100);
   }
+
+  // Get the user's previous score
+ // Get the user's previous score
+// Get the user's current score (highest score ever)
+const { data: currentScoreData } = await supabase
+  .from("scores")
+  .select("competence_score")
+  .eq("user_id", user_id)
+  .order("competence_score", { ascending: false })
+  .limit(1);
+
+const currentScore = currentScoreData?.[0]?.competence_score ?? 1000;
+const delta = weeklyReturn * SENSITIVITY;
+const newScore = currentScore + delta;
+
+  await supabase.from("scores").upsert(
+    {
+      user_id,
+      week_start: WEEK_START,
+      competence_score: newScore,
+      leaderboard_ranking: null,
+    },
+    { onConflict: "user_id,week_start" }
+  );
+
+  console.log(
+    `  ${user_id}: ${(weeklyReturn * 100).toFixed(2)}% return | ${currentScore.toFixed(0)} + ${delta.toFixed(0)} = ${newScore.toFixed(0)}`
+  );
+}
 
   // 4. Calculate weighted portfolio
   console.log(`\n🎯 Calculating weighted portfolio`);
