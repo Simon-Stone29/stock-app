@@ -13,19 +13,31 @@ const supabase = createClient(
 
 const SENSITIVITY = 100;
 
+// ========================================
+// TEST MODE - Set to a date string to test, or null to use real current date
+// ========================================
+const TEST_DATE: string | null = "2026-05-28"; // Set to null for production
+// ========================================
+
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getThisMonday(): string {
-  const today = new Date();
+  const today = TEST_DATE ? new Date(TEST_DATE) : new Date();
   const day = today.getDay();
   const daysBack = day === 0 ? 6 : day - 1;
-  const monday = new Date(today);
-  monday.setDate(monday.getDate() - daysBack);
-  return monday.toISOString().split("T")[0];
+  today.setDate(today.getDate() - daysBack);
+  return getLocalDateString(today);
 }
 
 function getToday(): string {
-  return new Date().toISOString().split("T")[0];
+  const today = TEST_DATE ? new Date(TEST_DATE) : new Date();
+  return getLocalDateString(today);
 }
-
 function getFriday(mondayStr: string): string {
   const d = new Date(mondayStr);
   d.setDate(d.getDate() + 4);
@@ -134,6 +146,7 @@ async function getPrices(symbol: string, mondayDate: string, fridayDate: string)
 }
 
 async function main() {
+  
   const WEEK_START = getThisMonday();
   const TODAY = getToday();
   const FRIDAY = getFriday(WEEK_START);
