@@ -4,27 +4,56 @@ import { supabase } from "@/src/lib/supabase";
 
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
-const WEEK_START = "2026-05-25";
+
+function getNextMonday(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  let daysUntilNextMonday;
+  
+  if (day === 6) {
+    daysUntilNextMonday = 2; // Saturday -> Monday (2 days)
+  } else if (day === 0) {
+    daysUntilNextMonday = 1; // Sunday -> Monday (1 day)
+  } else {
+    daysUntilNextMonday = 8 - day; // Mon-Fri -> next Monday
+  }
+  
+  d.setDate(d.getDate() + daysUntilNextMonday);
+  return d.toISOString().split("T")[0];
+}
+
+function getLastMonday(date: Date): string {
+  const thisMonday = new Date(date);
+  const day = thisMonday.getDay();
+  const daysBack = day === 0 ? 6 : day - 1;
+  thisMonday.setDate(thisMonday.getDate() - daysBack);
+  
+  const lastMonday = new Date(thisMonday);
+  return lastMonday.toISOString().split("T")[0];
+}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [stocks, setStocks] = useState<any[]>([]);
   const [picks, setPicks] = useState<{ symbol: string; percentage: number }[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [testDateTime, setTestDateTime] = useState(new Date().toISOString().slice(0, 16));
+  const [isVotingPhase, setIsVotingPhase] = useState(true);
+  const [weekStart, setWeekStart] = useState("");
+  const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
 
-useEffect(() => {
-  supabase.auth.getUser().then(async ({ data }) => {
-    if (data.user) {
-      setUser(data.user);
-      
-      // Create user in public.users if they don't exist
-      await supabase.from("users").upsert(
-        { id: data.user.id, email: data.user.email },
-        { onConflict: "id" }
-      );
-    }
-  });
-}, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        setUser(data.user);
+        
+        await supabase.from("users").upsert(
+          { id: data.user.id, email: data.user.email },
+          { onConflict: "id" }
+        );
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -34,9 +63,91 @@ useEffect(() => {
       .then(({ data }) => setStocks(data || []));
   }, [user]);
 
+  // Calculate week_start from test date
+  useEffect(() => {
+    const testDate = new Date(testDateTime);
+    setWeekStart(getNextMonday(testDate));
+  }, [testDateTime]);
+
+  useEffect(() => {
+    if (!user || !weekStart) return;
+    supabase
+      .from("weekly_picks")
+      .select("symbol, percentage")
+      .eq("user_id", user.id)
+      .eq("week_start", weekStart)
+      .then(({ data }) => {
+        if (data?.length) setPicks(data);
+      });
+  }, [user, weekStart]);
+
+  // Calculate last week's gain
+  useEffect(() => {
+    if (!user) return;
+
+    const calculateLastWeekGain = async () => {
+      const testDate = new Date(testDateTime);
+      const previousWeekMonday = getLastMonday(testDate);
+
+      const { data: prevPicks } = await supabase
+        .from("weekly_picks")
+        .select("symbol, percentage")
+        .eq("user_id", user.id)
+        .eq("week_start", previousWeekMonday);
+
+      if (!prevPicks?.length) {
+        setLastWeekGain(null);
+        return;
+      }
+
+      const { data: prices } = await supabase
+        .from("stock_prices")
+        .select("symbol, open_price, close_price")
+        .eq("week_start", previousWeekMonday);
+
+      if (!prices?.length) {
+        setLastWeekGain(null);
+        return;
+      }
+
+      const priceMap: Record<string, { open: number; close: number }> = {};
+      prices.forEach(p => {
+        priceMap[p.symbol] = { open: p.open_price, close: p.close_price };
+      });
+
+      let weeklyReturn = 0;
+      for (const pick of prevPicks) {
+        const price = priceMap[pick.symbol];
+        if (!price || price.open === 0) continue;
+        const stockReturn = (price.close - price.open) / price.open;
+        weeklyReturn += stockReturn * (pick.percentage / 100);
+      }
+
+      setLastWeekGain(weeklyReturn * 100);
+    };
+
+    calculateLastWeekGain();
+  }, [user, testDateTime]);
+
+  // Determine voting phase
+  useEffect(() => {
+    const testDate = new Date(testDateTime);
+    const day = testDate.getDay();
+    const hour = testDate.getHours();
+
+    const isSat = day === 6;
+    const isSun = day === 0;
+    const isAfter9AM = hour >= 9;
+    const isBeforeMidnight = hour < 24;
+
+    const voting = (isSat && isAfter9AM) || (isSun && isBeforeMidnight);
+    setIsVotingPhase(voting);
+  }, [testDateTime]);
+
   const login = () => supabase.auth.signInWithOAuth({ provider: "google" });
 
   const addStock = () => {
+    if (!isVotingPhase) return alert("Voting phase is closed");
     if (!selectedSymbol) return;
     if (picks.length >= MAX_STOCKS) return alert("Max 10 stocks");
     if (picks.find((p) => p.symbol === selectedSymbol)) return alert("Already added");
@@ -45,6 +156,7 @@ useEffect(() => {
   };
 
   const updatePercentage = (symbol: string, value: number) => {
+    if (!isVotingPhase) return;
     const newPicks = picks.map((p) =>
       p.symbol === symbol ? { ...p, percentage: value } : p
     );
@@ -54,27 +166,29 @@ useEffect(() => {
   };
 
   const removeStock = (symbol: string) => {
+    if (!isVotingPhase) return;
     setPicks(picks.filter((p) => p.symbol !== symbol));
   };
 
   const totalAllocated = picks.reduce((sum, p) => sum + p.percentage, 0);
 
   const submitPicks = async () => {
-    if (!user) return;
+    if (!isVotingPhase) return alert("Voting phase is closed");
+    if (!user || !weekStart) return;
     if (totalAllocated !== 100) return alert("Total must equal 100%");
 
     await supabase
       .from("weekly_picks")
       .delete()
       .eq("user_id", user.id)
-      .eq("week_start", WEEK_START);
+      .eq("week_start", weekStart);
 
     await supabase.from("weekly_picks").insert(
       picks.map((p) => ({
         user_id: user.id,
         symbol: p.symbol,
         percentage: p.percentage,
-        week_start: WEEK_START,
+        week_start: weekStart,
       }))
     );
 
@@ -97,6 +211,27 @@ useEffect(() => {
         <span className="text-muted small">{user.email}</span>
       </div>
 
+      {/* TEST CONTROLS */}
+      <div className="card mb-4 bg-light">
+        <div className="card-body">
+          <label className="form-label small">TEST: Set Date/Time</label>
+          <div className="d-flex gap-2 align-items-center">
+            <input
+              type="datetime-local"
+              className="form-control form-control-sm"
+              value={testDateTime}
+              onChange={(e) => setTestDateTime(e.target.value)}
+            />
+            <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Last Week Gain */}
+      <div className="alert alert-info">
+        Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
+      </div>
+
       {/* Add Stock */}
       <div className="card mb-4">
         <div className="card-body">
@@ -106,6 +241,7 @@ useEffect(() => {
               className="form-select"
               value={selectedSymbol}
               onChange={(e) => setSelectedSymbol(e.target.value)}
+              disabled={!isVotingPhase}
             >
               <option value="">Select a stock...</option>
               {stocks.map((s) => (
@@ -114,10 +250,11 @@ useEffect(() => {
                 </option>
               ))}
             </select>
-            <button className="btn btn-primary" onClick={addStock}>
+            <button className="btn btn-primary" onClick={addStock} disabled={!isVotingPhase}>
               Add
             </button>
           </div>
+          {!isVotingPhase && <small className="text-muted d-block mt-2">Voting closed. Try again Saturday 9 AM.</small>}
         </div>
       </div>
 
@@ -135,6 +272,7 @@ useEffect(() => {
                     <button
                       className="btn btn-sm btn-outline-danger"
                       onClick={() => removeStock(p.symbol)}
+                      disabled={!isVotingPhase}
                     >
                       ✕
                     </button>
@@ -147,6 +285,7 @@ useEffect(() => {
                   max={MAX_SINGLE_ALLOCATION}
                   value={p.percentage}
                   onChange={(e) => updatePercentage(p.symbol, Number(e.target.value))}
+                  disabled={!isVotingPhase}
                 />
               </div>
             ))}
@@ -164,7 +303,7 @@ useEffect(() => {
             <button
               className="btn btn-success"
               onClick={submitPicks}
-              disabled={totalAllocated !== 100}
+              disabled={!isVotingPhase || totalAllocated !== 100}
             >
               Submit Picks
             </button>
