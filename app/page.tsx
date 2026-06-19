@@ -41,6 +41,7 @@ export default function Home() {
   const [isVotingPhase, setIsVotingPhase] = useState(true);
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
+  const [serverTime, setServerTime] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -63,11 +64,40 @@ export default function Home() {
       .then(({ data }) => setStocks(data || []));
   }, [user]);
 
-  // Calculate week_start from test date
+  // Fetch server time context
   useEffect(() => {
-    const testDate = new Date(testDateTime);
-    setWeekStart(getNextMonday(testDate));
-  }, [testDateTime]);
+    const fetchServerTime = () => {
+      fetch("/api/time-context")
+        .then((res) => res.json())
+        .then((data) => setServerTime(data));
+    };
+
+    fetchServerTime();
+    const interval = setInterval(fetchServerTime, 60000); // Refresh every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate week_start from test date or server time
+  useEffect(() => {
+    if (serverTime?.isSimulation) {
+      // In simulation mode, server controls time
+      setWeekStart(serverTime.weekStart);
+      setIsVotingPhase(serverTime.votingOpen);
+    } else {
+      // In production, use local test controls
+      const testDate = new Date(testDateTime);
+      setWeekStart(getNextMonday(testDate));
+
+      const day = testDate.getDay();
+      const hour = testDate.getHours();
+      const isSat = day === 6;
+      const isSun = day === 0;
+      const isAfter9AM = hour >= 9;
+      const isBeforeMidnight = hour < 24;
+      const voting = (isSat && isAfter9AM) || (isSun && isBeforeMidnight);
+      setIsVotingPhase(voting);
+    }
+  }, [testDateTime, serverTime]);
 
   useEffect(() => {
     if (!user || !weekStart) return;
@@ -129,20 +159,6 @@ export default function Home() {
     calculateLastWeekGain();
   }, [user, testDateTime]);
 
-  // Determine voting phase
-  useEffect(() => {
-    const testDate = new Date(testDateTime);
-    const day = testDate.getDay();
-    const hour = testDate.getHours();
-
-    const isSat = day === 6;
-    const isSun = day === 0;
-    const isAfter9AM = hour >= 9;
-    const isBeforeMidnight = hour < 24;
-
-    const voting = (isSat && isAfter9AM) || (isSun && isBeforeMidnight);
-    setIsVotingPhase(voting);
-  }, [testDateTime]);
 
   const login = () => supabase.auth.signInWithOAuth({ provider: "google" });
 
@@ -212,20 +228,28 @@ export default function Home() {
       </div>
 
       {/* TEST CONTROLS */}
-      <div className="card mb-4 bg-light">
-        <div className="card-body">
-          <label className="form-label small">TEST: Set Date/Time</label>
-          <div className="d-flex gap-2 align-items-center">
-            <input
-              type="datetime-local"
-              className="form-control form-control-sm"
-              value={testDateTime}
-              onChange={(e) => setTestDateTime(e.target.value)}
-            />
-            <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
+      {!serverTime?.isSimulation && (
+        <div className="card mb-4 bg-light">
+          <div className="card-body">
+            <label className="form-label small">TEST: Set Date/Time</label>
+            <div className="d-flex gap-2 align-items-center">
+              <input
+                type="datetime-local"
+                className="form-control form-control-sm"
+                value={testDateTime}
+                onChange={(e) => setTestDateTime(e.target.value)}
+              />
+              <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {serverTime?.isSimulation && (
+        <div className="alert alert-warning">
+          <strong>Simulation Mode Active</strong> - Server time: {serverTime.currentTime}
+        </div>
+      )}
 
       {/* Last Week Gain */}
       <div className="alert alert-info">

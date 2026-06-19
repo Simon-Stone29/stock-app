@@ -16,17 +16,20 @@ export default function Leaderboard() {
         
         console.log("Users:", users, usersError);
 
-        // Get all scores
+        // Get latest score for each user
         const { data: scores, error: scoresError } = await supabase
           .from("scores")
-          .select("user_id, competence_score");
-        
+          .select("user_id, competence_score, week_start")
+          .order("week_start", { ascending: false });
+
         console.log("Scores:", scores, scoresError);
 
-        // Create score map
+        // Create score map with only the latest score per user
         const scoreMap: Record<string, number> = {};
         scores?.forEach((score) => {
-          scoreMap[score.user_id] = score.competence_score;
+          if (!scoreMap[score.user_id]) {
+            scoreMap[score.user_id] = score.competence_score;
+          }
         });
 
         console.log("Score map:", scoreMap);

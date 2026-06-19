@@ -2,18 +2,25 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 
-const WEEK_START = "2026-05-25";
-
 export default function GroupPortfolio() {
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [stocks, setStocks] = useState<any>({});
+  const [weekStart, setWeekStart] = useState<string>("");
 
   useEffect(() => {
+    fetch("/api/time-context")
+      .then((res) => res.json())
+      .then((data) => setWeekStart(data.weekStart));
+  }, []);
+
+  useEffect(() => {
+    if (!weekStart) return;
+
     const fetchPortfolio = async () => {
       const { data: portfolioData } = await supabase
         .from("weekly_portfolio")
         .select("symbol, percentage")
-        .eq("week_start", WEEK_START)
+        .eq("week_start", weekStart)
         .order("percentage", { ascending: false });
 
       // Get stock names
@@ -28,11 +35,12 @@ export default function GroupPortfolio() {
     };
 
     fetchPortfolio();
-  }, []);
+  }, [weekStart]);
 
   return (
     <div className="container mt-4">
       <h1 className="mb-4">Group Portfolio</h1>
+      {weekStart && <p className="text-muted">Week of {weekStart}</p>}
       <div className="card">
         <div className="card-body">
           <table className="table">
