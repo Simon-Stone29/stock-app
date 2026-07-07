@@ -45,6 +45,7 @@ export default function Home() {
   const [serverTime, setServerTime] = useState<any>(null);
 
   useEffect(() => {
+    setCurrentDateTime(new Date());
     const interval = setInterval(() => {
       setCurrentDateTime(new Date());
     }, 60000);
