@@ -37,7 +37,7 @@ export default function Home() {
   const [stocks, setStocks] = useState<any[]>([]);
   const [picks, setPicks] = useState<{ symbol: string; percentage: number }[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [currentDateTime, setCurrentDateTime] = useState(() => new Date().toISOString().slice(0, 16));
+  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
   const [isVotingPhase, setIsVotingPhase] = useState(true);
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
@@ -45,6 +45,10 @@ export default function Home() {
   const [serverTime, setServerTime] = useState<any>(null);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 60000);
+
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
         setUser(data.user);
@@ -55,6 +59,8 @@ export default function Home() {
         );
       }
     });
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -86,7 +92,7 @@ export default function Home() {
       setIsVotingPhase(serverTime.votingOpen);
     } else {
       // In production, use the live current time
-      const testDate = new Date(currentDateTime);
+      const testDate = currentDateTime;
       setWeekStart(getNextMonday(testDate));
 
       const day = testDate.getDay();
@@ -117,7 +123,7 @@ export default function Home() {
     if (!user) return;
 
     const calculateLastWeekGain = async () => {
-      const testDate = new Date(currentDateTime);
+      const testDate = currentDateTime;
       const previousWeekMonday = getLastMonday(testDate);
 
       const { data: prevPicks } = await supabase
@@ -275,7 +281,7 @@ export default function Home() {
           <div className="card-body d-flex justify-content-between align-items-center">
             <div>
               <div className="small text-muted">Current time</div>
-              <div className="fw-semibold">{new Date(currentDateTime).toLocaleString()}</div>
+              <div className="fw-semibold">{currentDateTime.toLocaleString()}</div>
             </div>
             <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
           </div>
