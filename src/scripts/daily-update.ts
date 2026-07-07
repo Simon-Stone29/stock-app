@@ -133,23 +133,33 @@ async function main() {
     .select("symbol, user_id, percentage")
     .eq("week_start", WEEK_START);
 
+  console.log(`\n🧪 Daily update debug: fetched weekly_picks for ${WEEK_START}`, {
+    picksError,
+    picksCount: picks?.length ?? 0,
+  });
+
   if (picksError || !picks?.length) {
     console.log("No picks found for this week. Nothing to update.");
     return;
   }
 
   const symbols = [...new Set(picks.map((p) => p.symbol))];
-  console.log(`\n📈 Fetching prices for ${symbols.length} symbols`);
+  console.log(`\n📈 Fetching prices for ${symbols.length} symbols`, { symbols });
 
   // 2. Get existing opening prices for the week
-  const { data: openPrices } = await supabase
+  const { data: openPrices, error: openPricesError } = await supabase
     .from("stock_prices")
-    .select("symbol, open_price, open_date")
+    .select("symbol, open_price")
     .eq("week_start", WEEK_START);
 
-  const openPriceMap: Record<string, { price: number; date: string }> = {};
+  console.log(`🧪 Daily update debug: loaded existing stock_prices for ${WEEK_START}`, {
+    openPricesError,
+    openPricesCount: openPrices?.length ?? 0,
+  });
+
+  const openPriceMap: Record<string, { price: number }> = {};
   openPrices?.forEach(p => {
-    openPriceMap[p.symbol] = { price: p.open_price, date: p.open_date };
+    openPriceMap[p.symbol] = { price: p.open_price };
   });
 
   // 3. Fetch current prices and update
@@ -158,18 +168,23 @@ async function main() {
     if (!openPriceMap[symbol]) {
       const openData = await getActualTradingDay(symbol, WEEK_START, "after");
       if (openData) {
-        openPriceMap[symbol] = { price: openData.price, date: openData.date };
+        openPriceMap[symbol] = { price: openData.price };
 
         // Store in database
-        await supabase.from("stock_prices").upsert({
+        const { error: upsertError } = await supabase.from("stock_prices").upsert({
           symbol,
           week_start: WEEK_START,
           open_price: openData.price,
-          open_date: openData.date,
           close_price: openData.price, // Initialize with same value
-          close_date: openData.date,
-          updated_at: new Date().toISOString(),
         }, { onConflict: "symbol,week_start" });
+
+        if (upsertError) {
+          console.error(`🧪 Daily update debug: failed upsert for ${symbol}`, { WEEK_START, openData, upsertError });
+        } else {
+          console.log(`🧪 Daily update debug: upserted stock_prices for ${symbol}`, { WEEK_START, openData });
+        }
+      } else {
+        console.warn(`🧪 Daily update debug: no openData for ${symbol} on or after ${WEEK_START}`);
       }
     }
 
@@ -185,15 +200,21 @@ async function main() {
       );
 
       // Update current price in database
-      await supabase
+      const { error: updateError } = await supabase
         .from("stock_prices")
         .update({
           close_price: currentPrice,
-          close_date: TODAY,
-          updated_at: new Date().toISOString(),
         })
         .eq("symbol", symbol)
         .eq("week_start", WEEK_START);
+
+      if (updateError) {
+        console.error(`🧪 Daily update debug: failed update close_price for ${symbol}`, { WEEK_START, TODAY, updateError });
+      }
+    } else if (!currentPrice) {
+      console.warn(`🧪 Daily update debug: no currentPrice found for ${symbol}`, { WEEK_START, TODAY });
+    } else if (!openPriceMap[symbol]) {
+      console.warn(`🧪 Daily update debug: no openPriceMap entry for ${symbol} while updating current price`, { WEEK_START });
     }
   }
 

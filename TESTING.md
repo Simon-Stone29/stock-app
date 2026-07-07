@@ -50,8 +50,8 @@ Edit `src/scripts/seed-test-data.ts` and set:
 ```typescript
 const TEST_WEEK_START = "2024-01-08"; // Match your SIMULATION_DATE
 const TEST_USERS = [
-  { id: "your-actual-user-id", email: "your-email@gmail.com" },
-  { id: "test-user-2", email: "test2@example.com" },
+  { id: "6b6a9671-c9dc-4d3c-893d-598cfc6dbf45", email: "aroomandacar@gmail.com" },
+  { id: "eb94fa15-5498-4bf6-9041-92a9e8e0cf63", email: "simonstone029@gmail.com" },
 ];
 ```
 

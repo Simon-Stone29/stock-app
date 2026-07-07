@@ -41,6 +41,7 @@ export default function Home() {
   const [isVotingPhase, setIsVotingPhase] = useState(true);
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
+  const [currentWeekGain, setCurrentWeekGain] = useState<number | null>(null);
   const [serverTime, setServerTime] = useState<any>(null);
 
   useEffect(() => {
@@ -159,6 +160,39 @@ export default function Home() {
     calculateLastWeekGain();
   }, [user, testDateTime]);
 
+  useEffect(() => {
+    if (!user || !weekStart) return;
+
+    const calculateCurrentWeekGain = async () => {
+      const { data: prices } = await supabase
+        .from("stock_prices")
+        .select("symbol, open_price, close_price")
+        .eq("week_start", weekStart);
+
+      if (!prices?.length || !picks?.length) {
+        setCurrentWeekGain(null);
+        return;
+      }
+
+      const priceMap: Record<string, { open: number; close: number }> = {};
+      prices.forEach(p => {
+        priceMap[p.symbol] = { open: p.open_price, close: p.close_price };
+      });
+
+      let weeklyReturn = 0;
+      for (const pick of picks) {
+        const price = priceMap[pick.symbol];
+        if (!price || price.open === 0) continue;
+        const stockReturn = (price.close - price.open) / price.open;
+        weeklyReturn += stockReturn * (pick.percentage / 100);
+      }
+
+      setCurrentWeekGain(picks.length ? weeklyReturn * 100 : null);
+    };
+
+    calculateCurrentWeekGain();
+  }, [user, weekStart, picks]);
+
 
   const login = () => supabase.auth.signInWithOAuth({ provider: "google" });
 
@@ -252,8 +286,11 @@ export default function Home() {
       )}
 
       {/* Last Week Gain */}
-      <div className="alert alert-info">
+      <div className="alert alert-info mb-2">
         Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
+      </div>
+      <div className="alert alert-secondary">
+        Current Week Change: <strong>{currentWeekGain !== null ? (currentWeekGain >= 0 ? "+" : "") + currentWeekGain.toFixed(2) + "%" : "—"}</strong>
       </div>
 
       {/* Add Stock */}

@@ -53,7 +53,7 @@ export async function GET() {
     currentTime: now.toISOString(),
     isSimulation: isSimulationMode(),
     votingOpen: isVotingOpen(now),
-    weekStart: getNextMonday(now),
-    lastWeekStart: getLastMonday(now),
+    weekStart: getLastMonday(now),
+    lastWeekStart: getLastMonday(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
   });
 }
