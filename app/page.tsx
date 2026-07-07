@@ -194,7 +194,16 @@ export default function Home() {
   }, [user, weekStart, picks]);
 
 
-  const login = () => supabase.auth.signInWithOAuth({ provider: "google" });
+  const login = () => {
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/` : undefined;
+
+    return supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+      },
+    });
+  };
 
   const addStock = () => {
     if (!isVotingPhase) return alert("Voting phase is closed");
