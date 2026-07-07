@@ -6,12 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "script:daily-update": "ts-node --compiler-options '{\"module\":\"commonjs\"}' src/scripts/daily-update.ts",
+    "script:weekly-finalize": "ts-node --compiler-options '{\"module\":\"commonjs\"}' src/scripts/weekly-finalize.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "dotenv": "^17.4.2",
     "next": "16.2.6",
+    "node-fetch": "^3.3.2",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "yahoo-finance2": "^3.14.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }
