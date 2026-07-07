@@ -37,7 +37,7 @@ export default function Home() {
   const [stocks, setStocks] = useState<any[]>([]);
   const [picks, setPicks] = useState<{ symbol: string; percentage: number }[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [testDateTime, setTestDateTime] = useState(new Date().toISOString().slice(0, 16));
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date().toISOString().slice(0, 16));
   const [isVotingPhase, setIsVotingPhase] = useState(true);
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
@@ -98,7 +98,7 @@ export default function Home() {
       const voting = (isSat && isAfter9AM) || (isSun && isBeforeMidnight);
       setIsVotingPhase(voting);
     }
-  }, [testDateTime, serverTime]);
+  }, [currentDateTime, serverTime]);
 
   useEffect(() => {
     if (!user || !weekStart) return;
@@ -158,7 +158,7 @@ export default function Home() {
     };
 
     calculateLastWeekGain();
-  }, [user, testDateTime]);
+  }, [user, currentDateTime]);
 
   useEffect(() => {
     if (!user || !weekStart) return;
@@ -270,20 +270,14 @@ export default function Home() {
         <span className="text-muted small">{user.email}</span>
       </div>
 
-      {/* TEST CONTROLS */}
       {!serverTime?.isSimulation && (
         <div className="card mb-4 bg-light">
-          <div className="card-body">
-            <label className="form-label small">TEST: Set Date/Time</label>
-            <div className="d-flex gap-2 align-items-center">
-              <input
-                type="datetime-local"
-                className="form-control form-control-sm"
-                value={testDateTime}
-                onChange={(e) => setTestDateTime(e.target.value)}
-              />
-              <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
+          <div className="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <div className="small text-muted">Current time</div>
+              <div className="fw-semibold">{new Date(currentDateTime).toLocaleString()}</div>
             </div>
+            <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
           </div>
         </div>
       )}
