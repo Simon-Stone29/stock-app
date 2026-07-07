@@ -85,8 +85,8 @@ export default function Home() {
       setWeekStart(serverTime.weekStart);
       setIsVotingPhase(serverTime.votingOpen);
     } else {
-      // In production, use local test controls
-      const testDate = new Date(testDateTime);
+      // In production, use the live current time
+      const testDate = new Date(currentDateTime);
       setWeekStart(getNextMonday(testDate));
 
       const day = testDate.getDay();
@@ -117,7 +117,7 @@ export default function Home() {
     if (!user) return;
 
     const calculateLastWeekGain = async () => {
-      const testDate = new Date(testDateTime);
+      const testDate = new Date(currentDateTime);
       const previousWeekMonday = getLastMonday(testDate);
 
       const { data: prevPicks } = await supabase
