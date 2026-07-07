@@ -1,7 +1,7 @@
 import YahooFinance from "yahoo-finance2";
-import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
+import { createSupabaseServerClient } from "../lib/supabase-server.ts";
 
 dotenv.config({ path: ".env.local" });
 
@@ -9,9 +9,9 @@ const yahooFinance = new YahooFinance({
   suppressNotices: ["ripHistorical"],
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createSupabaseServerClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 /**
