@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "script:daily-update": "ts-node src/scripts/daily-update.ts",
-    "script:weekly-finalize": "ts-node src/scripts/weekly-finalize.ts"
+    "script:daily-update": "tsx src/scripts/daily-update.ts",
+    "script:weekly-finalize": "tsx src/scripts/weekly-finalize.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
@@ -27,7 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }
