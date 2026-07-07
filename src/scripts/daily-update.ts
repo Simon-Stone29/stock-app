@@ -1,7 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
-import { getSimulationDate, isSimulationMode } from "../config/simulation";
+import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
 
 dotenv.config({ path: ".env.local" });
 

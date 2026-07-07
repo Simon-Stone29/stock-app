@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "script:daily-update": "ts-node --compiler-options '{\"module\":\"commonjs\"}' src/scripts/daily-update.ts",
-    "script:weekly-finalize": "ts-node --compiler-options '{\"module\":\"commonjs\"}' src/scripts/weekly-finalize.ts"
+    "script:daily-update": "ts-node src/scripts/daily-update.ts",
+    "script:weekly-finalize": "ts-node src/scripts/weekly-finalize.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
