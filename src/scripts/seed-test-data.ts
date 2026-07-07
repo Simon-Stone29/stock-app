@@ -21,7 +21,7 @@ const supabase = createClient(
  */
 
 // Configuration
-const TEST_WEEK_START = "2024-01-08"; // Monday to seed picks for
+const TEST_WEEK_START = "2022-01-03"; // Monday to seed picks for
 const TEST_USERS = [
   { id: "test-user-1", email: "test1@example.com" },
   { id: "test-user-2", email: "test2@example.com" },
