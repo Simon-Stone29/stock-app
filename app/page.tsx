@@ -263,6 +263,10 @@ export default function Home() {
 
   if (!user) return (
     <div className="container mt-5 text-center">
+      <div className="mb-3">
+        <a href="/group-portfolio" className="btn btn-link">Group Portfolio</a>
+        <a href="/leaderboard" className="btn btn-link">Leaderboard</a>
+      </div>
       <h1>Stock Picker</h1>
       <button className="btn btn-primary mt-3" onClick={login}>
         Login with Google
@@ -272,6 +276,10 @@ export default function Home() {
 
   return (
     <div className="container mt-4">
+      <div className="mb-3">
+        <a href="/group-portfolio" className="btn btn-link">Group Portfolio</a>
+        <a href="/leaderboard" className="btn btn-link">Leaderboard</a>
+      </div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h3">Stock Picker</h1>
         <span className="text-muted small">{user.email}</span>

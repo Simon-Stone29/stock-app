@@ -59,6 +59,10 @@ export default function Leaderboard() {
 
   return (
     <div className="container mt-4">
+      <div className="mb-3">
+        <a href="/" className="btn btn-link">Home</a>
+        <a href="/group-portfolio" className="btn btn-link">Group Portfolio</a>
+      </div>
       <h1 className="mb-4">Leaderboard</h1>
       <div className="card">
         <div className="card-body">

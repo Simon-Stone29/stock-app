@@ -29,11 +29,11 @@ const supabase = createClient(
 
   // ========================================
 
-  const TEST_WEEK_START = "2024-01-08"; // Monday of the week you want to test
+  const TEST_WEEK_START = "2022-01-03"; // Monday of the week you want to test
 
-  const TEST_USER_1 = "test-user-001";
+  const TEST_USER_1 = "6b6a9671-c9dc-4d3c-893d-598cfc6dbf45";
 
-  const TEST_USER_2 = "test-user-002";
+  const TEST_USER_2 = "eb94fa15-5498-4bf6-9041-92a9e8e0cf63";
 
  
 
