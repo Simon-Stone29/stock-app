@@ -79,10 +79,6 @@ export default function GroupPortfolio() {
 
   return (
     <div className="container mt-4">
-      <div className="mb-3">
-        <a href="/" className="btn btn-link">Home</a>
-        <a href="/leaderboard" className="btn btn-link">Leaderboard</a>
-      </div>
       <h1 className="mb-4">Group Portfolio</h1>
       {weekStart && (
         <div className="mb-2">
