@@ -261,125 +261,129 @@ export default function Home() {
     alert("Picks submitted!");
   };
 
-  if (!user) return (
-    <div className="container mt-5 text-center">
-      <h1>Stock Picker</h1>
-      <button className="btn btn-primary mt-3" onClick={login}>
-        Login with Google
-      </button>
-    </div>
-  );
-
   return (
     <div className="container mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h3">Stock Picker</h1>
-        <span className="text-muted small">{user.email}</span>
-      </div>
-
-      {!serverTime?.isSimulation && (
-        <div className="card mb-4 bg-light">
-          <div className="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div className="small text-muted">Current time</div>
-              <div className="fw-semibold">{currentDateTime.toLocaleString()}</div>
-            </div>
-            <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
-          </div>
+      {!user && (
+        <div className="text-center py-4">
+          <h1>Stock Picker</h1>
+          <button className="btn btn-primary mt-3" onClick={login}>
+            Login with Google
+          </button>
         </div>
       )}
 
-      {serverTime?.isSimulation && (
-        <div className="alert alert-warning">
-          <strong>Simulation Mode Active</strong> - Server time: {serverTime.currentTime}
-        </div>
-      )}
-
-      {/* Last Week Gain */}
-      <div className="alert alert-info mb-2">
-        Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
-      </div>
-      <div className="alert alert-secondary">
-        Current Week Change: <strong>{currentWeekGain !== null ? (currentWeekGain >= 0 ? "+" : "") + currentWeekGain.toFixed(2) + "%" : "—"}</strong>
-      </div>
-
-      {/* Add Stock */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <h5 className="card-title">Add a Stock</h5>
-          <div className="d-flex gap-2">
-            <select
-              className="form-select"
-              value={selectedSymbol}
-              onChange={(e) => setSelectedSymbol(e.target.value)}
-              disabled={!isVotingPhase}
-            >
-              <option value="">Select a stock...</option>
-              {stocks.map((s) => (
-                <option key={s.Symbol} value={s.Symbol}>
-                  {s.Symbol} — {s.Name}
-                </option>
-              ))}
-            </select>
-            <button className="btn btn-primary" onClick={addStock} disabled={!isVotingPhase}>
-              Add
-            </button>
+      {user && (
+        <>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h1 className="h3">Stock Picker</h1>
+            <span className="text-muted small">{user.email}</span>
           </div>
-          {!isVotingPhase && <small className="text-muted d-block mt-2">Voting closed. Try again Saturday 9 AM.</small>}
-        </div>
-      </div>
 
-      {/* Picks */}
-      {picks.length > 0 && (
-        <div className="card mb-4">
-          <div className="card-body">
-            <h5 className="card-title">Your Picks</h5>
-            {picks.map((p) => (
-              <div key={p.symbol} className="mb-3">
-                <div className="d-flex justify-content-between">
-                  <span className="fw-bold">{p.symbol}</span>
-                  <div className="d-flex align-items-center gap-2">
-                    <span>{p.percentage}%</span>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => removeStock(p.symbol)}
-                      disabled={!isVotingPhase}
-                    >
-                      ✕
-                    </button>
-                  </div>
+          {!serverTime?.isSimulation && (
+            <div className="card mb-4 bg-light">
+              <div className="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div className="small text-muted">Current time</div>
+                  <div className="fw-semibold">{currentDateTime.toLocaleString()}</div>
                 </div>
-                <input
-                  type="range"
-                  className="form-range"
-                  min={0}
-                  max={MAX_SINGLE_ALLOCATION}
-                  value={p.percentage}
-                  onChange={(e) => updatePercentage(p.symbol, Number(e.target.value))}
-                  disabled={!isVotingPhase}
-                />
+                <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Total + Submit */}
-      {picks.length > 0 && (
-        <div className="card">
-          <div className="card-body d-flex justify-content-between align-items-center">
-            <span className={totalAllocated === 100 ? "text-success fw-bold" : "text-danger fw-bold"}>
-              Total: {totalAllocated}% {totalAllocated === 100 ? "✓" : `(${100 - totalAllocated}% remaining)`}
-            </span>
-            <button
-              className="btn btn-success"
-              onClick={submitPicks}
-              disabled={!isVotingPhase || totalAllocated !== 100}
-            >
-              Submit Picks
-            </button>
+          {serverTime?.isSimulation && (
+            <div className="alert alert-warning">
+              <strong>Simulation Mode Active</strong> - Server time: {serverTime.currentTime}
+            </div>
+          )}
+
+          {/* Last Week Gain */}
+          <div className="alert alert-info mb-2">
+            Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
           </div>
-        </div>
+          <div className="alert alert-secondary">
+            Current Week Change: <strong>{currentWeekGain !== null ? (currentWeekGain >= 0 ? "+" : "") + currentWeekGain.toFixed(2) + "%" : "—"}</strong>
+          </div>
+
+          {/* Add Stock */}
+          <div className="card mb-4">
+            <div className="card-body">
+              <h5 className="card-title">Add a Stock</h5>
+              <div className="d-flex gap-2">
+                <select
+                  className="form-select"
+                  value={selectedSymbol}
+                  onChange={(e) => setSelectedSymbol(e.target.value)}
+                  disabled={!isVotingPhase}
+                >
+                  <option value="">Select a stock...</option>
+                  {stocks.map((s) => (
+                    <option key={s.Symbol} value={s.Symbol}>
+                      {s.Symbol} — {s.Name}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn btn-primary" onClick={addStock} disabled={!isVotingPhase}>
+                  Add
+                </button>
+              </div>
+              {!isVotingPhase && <small className="text-muted d-block mt-2">Voting closed. Try again Saturday 9 AM.</small>}
+            </div>
+          </div>
+
+          {/* Picks */}
+          {picks.length > 0 && (
+            <div className="card mb-4">
+              <div className="card-body">
+                <h5 className="card-title">Your Picks</h5>
+                {picks.map((p) => (
+                  <div key={p.symbol} className="mb-3">
+                    <div className="d-flex justify-content-between">
+                      <span className="fw-bold">{p.symbol}</span>
+                      <div className="d-flex align-items-center gap-2">
+                        <span>{p.percentage}%</span>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => removeStock(p.symbol)}
+                          disabled={!isVotingPhase}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      className="form-range"
+                      min={0}
+                      max={MAX_SINGLE_ALLOCATION}
+                      value={p.percentage}
+                      onChange={(e) => updatePercentage(p.symbol, Number(e.target.value))}
+                      disabled={!isVotingPhase}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Total + Submit */}
+          {picks.length > 0 && (
+            <div className="card">
+              <div className="card-body d-flex justify-content-between align-items-center">
+                <span className={totalAllocated === 100 ? "text-success fw-bold" : "text-danger fw-bold"}>
+                  Total: {totalAllocated}% {totalAllocated === 100 ? "✓" : `(${100 - totalAllocated}% remaining)`}
+                </span>
+                <button
+                  className="btn btn-success"
+                  onClick={submitPicks}
+                  disabled={!isVotingPhase || totalAllocated !== 100}
+                >
+                  Submit Picks
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
