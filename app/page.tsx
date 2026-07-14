@@ -5,23 +5,6 @@ import { supabase } from "@/src/lib/supabase";
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
 
-function getNextMonday(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  let daysUntilNextMonday;
-  
-  if (day === 6) {
-    daysUntilNextMonday = 2; // Saturday -> Monday (2 days)
-  } else if (day === 0) {
-    daysUntilNextMonday = 1; // Sunday -> Monday (1 day)
-  } else {
-    daysUntilNextMonday = 8 - day; // Mon-Fri -> next Monday
-  }
-  
-  d.setDate(d.getDate() + daysUntilNextMonday);
-  return d.toISOString().split("T")[0];
-}
-
 function getLastMonday(date: Date): string {
   const thisMonday = new Date(date);
   const day = thisMonday.getDay();
@@ -30,6 +13,12 @@ function getLastMonday(date: Date): string {
   
   const lastMonday = new Date(thisMonday);
   return lastMonday.toISOString().split("T")[0];
+}
+
+function getPreviousMonday(date: Date): string {
+  const currentMonday = new Date(getLastMonday(date));
+  currentMonday.setDate(currentMonday.getDate() - 7);
+  return currentMonday.toISOString().split("T")[0];
 }
 
 export default function Home() {
@@ -50,18 +39,36 @@ export default function Home() {
       setCurrentDateTime(new Date());
     }, 60000);
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (data.user) {
-        setUser(data.user);
-        
+    let isMounted = true;
+
+    const syncUser = async (nextUser: any) => {
+      if (!isMounted) return;
+      setUser(nextUser);
+
+      if (nextUser) {
         await supabase.from("users").upsert(
-          { id: data.user.id, email: data.user.email },
+          { id: nextUser.id, email: nextUser.email },
           { onConflict: "id" }
         );
       }
+    };
+
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      await syncUser(session?.user ?? null);
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      void syncUser(session?.user ?? null);
     });
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -94,7 +101,7 @@ export default function Home() {
     } else {
       // In production, use the live current time
       const testDate = currentDateTime;
-      setWeekStart(getNextMonday(testDate));
+      setWeekStart(getLastMonday(testDate));
 
       const day = testDate.getDay();
       const hour = testDate.getHours();
@@ -125,7 +132,7 @@ export default function Home() {
 
     const calculateLastWeekGain = async () => {
       const testDate = currentDateTime;
-      const previousWeekMonday = getLastMonday(testDate);
+      const previousWeekMonday = getPreviousMonday(testDate);
 
       const { data: prevPicks } = await supabase
         .from("weekly_picks")
@@ -202,7 +209,7 @@ export default function Home() {
 
 
   const login = () => {
-    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/` : undefined;
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined;
 
     return supabase.auth.signInWithOAuth({
       provider: "google",
