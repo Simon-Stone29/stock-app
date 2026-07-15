@@ -2,6 +2,7 @@ import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
+import { getLastMonday, getZonedDateString } from "../lib/weekDates.ts";
 
 dotenv.config({ path: ".env.local" });
 
@@ -20,25 +21,11 @@ const supabase = createClient(
  * Purpose: Fetch current prices and update daily performance tracking
  * Run: Every weekday during/after market hours (e.g., 5 PM ET)
  * Does NOT update scores - just updates current price data for display
+ *
+ * NOTE: Week/date calculations use src/lib/weekDates.ts (America/New_York)
+ * so this script agrees with the client and the /api/time-context route
+ * regardless of what timezone the machine running this cron job is in.
  */
-
-function getLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getMondayOfWeek(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay();
-
-  // If Sunday (0), go back 6 days. If Monday (1), stay. Otherwise go back (day - 1) days
-  const daysBack = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - daysBack);
-
-  return getLocalDateString(d);
-}
 
 async function getActualTradingDay(
   symbol: string,
@@ -119,8 +106,8 @@ async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<numbe
 
 async function main() {
   const referenceDate = getSimulationDate();
-  const TODAY = getLocalDateString(referenceDate);
-  const WEEK_START = getMondayOfWeek(referenceDate);
+  const TODAY = getZonedDateString(referenceDate);
+  const WEEK_START = getLastMonday(referenceDate);
 
   console.log(`\n📊 Daily Price Update`);
   console.log(`   Today: ${TODAY}`);

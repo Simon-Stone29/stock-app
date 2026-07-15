@@ -1,8 +1,14 @@
+import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
+import { getLastMonday, getZonedDateString } from "../lib/weekDates.ts";
 
 dotenv.config({ path: ".env.local" });
+
+const yahooFinance = new YahooFinance({
+  suppressNotices: ["ripHistorical"],
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,51 +16,102 @@ const supabase = createClient(
 );
 
 /**
- * WEEKLY PORTFOLIO CALCULATION SCRIPT
+ * DAILY UPDATE SCRIPT
  *
- * Purpose: Calculate group portfolio allocation based on current user scores
- * and update user scores from the just-finished prior week.
- * Run: Monday morning before market opens (after picks submitted over weekend)
- * Reads: current week picks, prior week picks, prices, and most recent scores
- * Writes: weekly_portfolio for current week and new user scores when available
+ * Purpose: Fetch current prices and update daily performance tracking
+ * Run: Every weekday during/after market hours (e.g., 5 PM ET)
+ * Does NOT update scores - just updates current price data for display
+ *
+ * NOTE: Week/date calculations use src/lib/weekDates.ts (America/New_York)
+ * so this script agrees with the client and the /api/time-context route
+ * regardless of what timezone the machine running this cron job is in.
  */
 
-function getLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+async function getActualTradingDay(
+  symbol: string,
+  targetDate: string,
+  direction: "before" | "after" = "after"
+): Promise<{ date: string; price: number } | null> {
+  try {
+    const start = new Date(targetDate);
+    start.setDate(start.getDate() - 14);
+
+    const end = new Date(targetDate);
+    end.setDate(end.getDate() + 14);
+
+    const historical = await yahooFinance.historical(symbol, {
+      period1: start,
+      period2: end,
+      interval: "1d",
+    });
+
+    if (!historical.length) return null;
+
+    if (direction === "before") {
+      // Find latest trading day on or before target
+      const matching = historical.filter((bar: any) => {
+        const barDate = bar.date instanceof Date
+          ? bar.date.toISOString().split("T")[0]
+          : bar.date;
+        return barDate <= targetDate;
+      });
+      const result = matching[matching.length - 1];
+      if (!result) return null;
+
+      return {
+        date: result.date instanceof Date
+          ? result.date.toISOString().split("T")[0]
+          : result.date,
+        price: result.close
+      };
+    } else {
+      // Find earliest trading day on or after target
+      const matching = historical.find((bar: any) => {
+        const barDate = bar.date instanceof Date
+          ? bar.date.toISOString().split("T")[0]
+          : bar.date;
+        return barDate >= targetDate;
+      });
+      if (!matching) return null;
+
+      return {
+        date: matching.date instanceof Date
+          ? matching.date.toISOString().split("T")[0]
+          : matching.date,
+        price: matching.open
+      };
+    }
+  } catch (err) {
+    console.error(`Error finding trading day for ${symbol}:`, err);
+    return null;
+  }
 }
 
-function getCurrentMonday(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay();
+async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<number | null> {
+  try {
+    if (asOfDate) {
+      // For simulation - get historical close price
+      const result = await getActualTradingDay(symbol, asOfDate, "before");
+      return result?.price ?? null;
+    }
 
-  // Go back to this week's Monday (not previous week)
-  const daysBack = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - daysBack);
-
-  return getLocalDateString(d);
-}
-
-function getPreviousMonday(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const daysBack = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - daysBack - 7);
-
-  return getLocalDateString(d);
+    // For production - get live quote
+    const quote = await yahooFinance.quote(symbol);
+    return quote.regularMarketPrice ?? null;
+  } catch (err) {
+    console.error(`Error fetching current price for ${symbol}:`, err);
+    return null;
+  }
 }
 
 async function main() {
   const referenceDate = getSimulationDate();
-  const TODAY = getLocalDateString(referenceDate);
-  const WEEK_START = getCurrentMonday(referenceDate);
-  const PREVIOUS_WEEK_START = getPreviousMonday(referenceDate);
+  const TODAY = getZonedDateString(referenceDate);
+  const WEEK_START = getLastMonday(referenceDate);
 
-  console.log(`\n🎯 Weekly Portfolio Calculation`);
-  console.log(`   Week: ${WEEK_START}`);
-  console.log(`   Running on: ${TODAY}`);
+  console.log(`\n📊 Daily Price Update`);
+  console.log(`   Today: ${TODAY}`);
+  console.log(`   Current week starts: ${WEEK_START}`);
   if (isSimulationMode()) console.log(`   [SIMULATION MODE]`);
 
   // 1. Get all picks for current week
@@ -63,155 +120,127 @@ async function main() {
     .select("symbol, user_id, percentage")
     .eq("week_start", WEEK_START);
 
-  if (picksError) {
-    console.error("Failed to load current week picks:", picksError);
+  console.log(`\n🧪 Daily update debug: fetched weekly_picks for ${WEEK_START}`, {
+    picksError,
+    picksCount: picks?.length ?? 0,
+  });
+
+  if (picksError || !picks?.length) {
+    console.log("No picks found for this week. Nothing to update.");
     return;
   }
 
-  console.log(`\n📋 Current week picks: ${picks?.length ?? 0} rows`);
+  const symbols = [...new Set(picks.map((p) => p.symbol))];
+  console.log(`\n📈 Fetching prices for ${symbols.length} symbols`, { symbols });
 
-  // 2. Attempt to score the prior week if data exists
-  const { data: previousPicks, error: previousPicksError } = await supabase
-    .from("weekly_picks")
-    .select("symbol, user_id, percentage")
-    .eq("week_start", PREVIOUS_WEEK_START);
+  // 2. Get existing opening prices for the week
+  const { data: openPrices, error: openPricesError } = await supabase
+    .from("stock_prices")
+    .select("symbol, open_price")
+    .eq("week_start", WEEK_START);
 
-  if (previousPicksError) {
-    console.error("Failed to load previous week picks:", previousPicksError);
-  }
+  console.log(`🧪 Daily update debug: loaded existing stock_prices for ${WEEK_START}`, {
+    openPricesError,
+    openPricesCount: openPrices?.length ?? 0,
+  });
 
-  if (previousPicks?.length) {
-    const { data: previousPrices, error: previousPricesError } = await supabase
-      .from("stock_prices")
-      .select("symbol, open_price, close_price")
-      .eq("week_start", PREVIOUS_WEEK_START);
+  const openPriceMap: Record<string, { price: number }> = {};
+  openPrices?.forEach(p => {
+    openPriceMap[p.symbol] = { price: p.open_price };
+  });
 
-    if (previousPricesError) {
-      console.error("Failed to load previous week prices:", previousPricesError);
-    }
+  // 3. Fetch current prices and update
+  for (const symbol of symbols) {
+    // If we don't have opening price yet, fetch it
+    if (!openPriceMap[symbol]) {
+      const openData = await getActualTradingDay(symbol, WEEK_START, "after");
+      if (openData) {
+        openPriceMap[symbol] = { price: openData.price };
 
-    const priceMap: Record<string, { open: number; close: number }> = {};
-    previousPrices?.forEach((row) => {
-      priceMap[row.symbol] = { open: row.open_price, close: row.close_price };
-    });
+        // Store in database
+        const { error: upsertError } = await supabase.from("stock_prices").upsert({
+          symbol,
+          week_start: WEEK_START,
+          open_price: openData.price,
+          close_price: openData.price, // Initialize with same value
+        }, { onConflict: "symbol,week_start" });
 
-    const priorUsers = [...new Set(previousPicks.map((p) => p.user_id))];
-    const scoreBaseline: Record<string, number> = {};
-
-    for (const user_id of priorUsers) {
-      const { data: scoreData } = await supabase
-        .from("scores")
-        .select("competence_score")
-        .eq("user_id", user_id)
-        .order("week_start", { ascending: false })
-        .limit(1);
-
-      scoreBaseline[user_id] = scoreData?.[0]?.competence_score ?? 1000;
-    }
-
-    const userPicks: Record<string, { symbol: string; percentage: number }[]> = {};
-    previousPicks.forEach((pick) => {
-      if (!userPicks[pick.user_id]) userPicks[pick.user_id] = [];
-      userPicks[pick.user_id].push(pick);
-    });
-
-    const scoreUpdates: Array<{ user_id: string; week_start: string; competence_score: number }> = [];
-
-    for (const [user_id, picksForUser] of Object.entries(userPicks)) {
-      let skipUser = false;
-      let weeklyReturn = 0;
-
-      for (const pick of picksForUser) {
-        const prices = priceMap[pick.symbol];
-        if (!prices || prices.open === 0 || prices.close === undefined) {
-          console.warn(`  Skipping score for user ${user_id.substring(0, 8)}: missing prices for ${pick.symbol}`);
-          skipUser = true;
-          break;
+        if (upsertError) {
+          console.error(`🧪 Daily update debug: failed upsert for ${symbol}`, { WEEK_START, openData, upsertError });
+        } else {
+          console.log(`🧪 Daily update debug: upserted stock_prices for ${symbol}`, { WEEK_START, openData });
         }
-        weeklyReturn += ((prices.close - prices.open) / prices.open) * (pick.percentage / 100);
+      } else {
+        console.warn(`🧪 Daily update debug: no openData for ${symbol} on or after ${WEEK_START}`);
       }
-
-      if (skipUser) continue;
-
-      const baseline = scoreBaseline[user_id] ?? 1000;
-      const newScore = Math.round(baseline + weeklyReturn * 100);
-      scoreUpdates.push({ user_id, week_start: WEEK_START, competence_score: newScore });
-      console.log(`  Scored user ${user_id.substring(0, 8)}: ${baseline} → ${newScore} (${(weeklyReturn * 100).toFixed(2)}%)`);
     }
 
-    if (scoreUpdates.length) {
-      const { error: scoreUpsertError } = await supabase
-        .from("scores")
-        .upsert(scoreUpdates, { onConflict: "user_id,week_start" });
+    // Fetch current price
+    const currentPrice = await getCurrentPrice(symbol, isSimulationMode() ? TODAY : undefined);
 
-      if (scoreUpsertError) {
-        console.error("Failed to upsert weekly scores:", scoreUpsertError);
+    if (currentPrice && openPriceMap[symbol]) {
+      const openPrice = openPriceMap[symbol].price;
+      const change = ((currentPrice - openPrice) / openPrice) * 100;
+
+      console.log(
+        `  ${symbol}: $${openPrice.toFixed(2)} → $${currentPrice.toFixed(2)} (${change >= 0 ? '+' : ''}${change.toFixed(2)}%)`
+      );
+
+      // Update current price in database
+      const { error: updateError } = await supabase
+        .from("stock_prices")
+        .update({
+          close_price: currentPrice,
+        })
+        .eq("symbol", symbol)
+        .eq("week_start", WEEK_START);
+
+      if (updateError) {
+        console.error(`🧪 Daily update debug: failed update close_price for ${symbol}`, { WEEK_START, TODAY, updateError });
       }
-    } else {
-      console.log("No previous-week users were scored because required price data was missing.");
+    } else if (!currentPrice) {
+      console.warn(`🧪 Daily update debug: no currentPrice found for ${symbol}`, { WEEK_START, TODAY });
+    } else if (!openPriceMap[symbol]) {
+      console.warn(`🧪 Daily update debug: no openPriceMap entry for ${symbol} while updating current price`, { WEEK_START });
     }
-  } else {
-    console.log(`\n⚠️ No previous week picks found for ${PREVIOUS_WEEK_START}; scores will not be updated.`);
   }
 
-  // 3. Get most recent score for each user
-  const uniqueUserIds = [...new Set((picks || []).map((p) => p.user_id))];
-  const userScores: Record<string, number> = {};
+  // 4. Calculate current performance (no score updates)
+  console.log(`\n💰 Current Week Performance (unrealized)`);
 
-  for (const user_id of uniqueUserIds) {
-    const { data: scoreData } = await supabase
-      .from("scores")
-      .select("competence_score")
-      .eq("user_id", user_id)
-      .order("week_start", { ascending: false })
-      .limit(1);
+  const { data: currentPrices } = await supabase
+    .from("stock_prices")
+    .select("symbol, open_price, close_price")
+    .eq("week_start", WEEK_START);
 
-    userScores[user_id] = scoreData?.[0]?.competence_score ?? 1000;
-  }
+  const priceMap: Record<string, { open: number; close: number }> = {};
+  currentPrices?.forEach(p => {
+    priceMap[p.symbol] = { open: p.open_price, close: p.close_price };
+  });
 
-  console.log(`\n💾 Current scores:`);
-  for (const [user_id, score] of Object.entries(userScores)) {
-    console.log(`  User ${user_id.substring(0, 8)}: ${score.toFixed(0)}`);
-  }
-
-  // 3. Calculate weighted portfolio allocation
-  console.log(`\n📊 Calculating weighted portfolio...`);
-
-  const maxScore = Math.max(...Object.values(userScores), 1000);
-  const contributions: Record<string, number> = {};
-
+  // Group picks by user
+  const byUser: Record<string, { symbol: string; percentage: number }[]> = {};
   for (const pick of picks) {
-    const userScore = userScores[pick.user_id];
-    const normalized = userScore / maxScore;
-    const contribution = normalized * (pick.percentage || 0);
-
-    contributions[pick.symbol] = (contributions[pick.symbol] || 0) + contribution;
+    if (!byUser[pick.user_id]) byUser[pick.user_id] = [];
+    byUser[pick.user_id].push(pick);
   }
 
-  const totalContribution = Object.values(contributions).reduce((a, b) => a + b, 0);
+  // Calculate each user's current return
+  for (const [user_id, userPicks] of Object.entries(byUser)) {
+    let weeklyReturn = 0;
 
-  // 4. Clear and insert portfolio for current week
-  await supabase.from("weekly_portfolio").delete().eq("week_start", WEEK_START);
+    for (const pick of userPicks) {
+      const prices = priceMap[pick.symbol];
+      if (!prices || prices.open === 0) continue;
 
-  for (const [symbol, contrib] of Object.entries(contributions)) {
-    const percentage = (contrib / totalContribution) * 100;
+      const stockReturn = (prices.close - prices.open) / prices.open;
+      weeklyReturn += stockReturn * (pick.percentage / 100);
+    }
 
-    await supabase.from("weekly_portfolio").insert({
-      symbol,
-      week_start: WEEK_START,
-      percentage: percentage,
-    });
+    console.log(`  User ${user_id.substring(0, 8)}: ${(weeklyReturn * 100).toFixed(2)}% (unrealized)`);
   }
 
-  console.log(`\n📈 Portfolio for ${WEEK_START}:`);
-  Object.entries(contributions)
-    .map(([symbol, contrib]) => ({ symbol, pct: (contrib / totalContribution) * 100 }))
-    .sort((a, b) => b.pct - a.pct)
-    .forEach(({ symbol, pct }) => {
-      console.log(`  ${symbol}: ${pct.toFixed(1)}%`);
-    });
-
-  console.log("\n✅ Portfolio calculation complete.");
+  console.log("\n✅ Daily update complete.");
 }
 
 main().catch(console.error);

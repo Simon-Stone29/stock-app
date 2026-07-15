@@ -1,25 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
-
+import { getLastMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
 
-function getLastMonday(date: Date): string {
-  const thisMonday = new Date(date);
-  const day = thisMonday.getDay();
-  const daysBack = day === 0 ? 6 : day - 1;
-  thisMonday.setDate(thisMonday.getDate() - daysBack);
-  
-  const lastMonday = new Date(thisMonday);
-  return lastMonday.toISOString().split("T")[0];
-}
+// Formats a Date as YYYY-MM-DD using LOCAL calendar components.
+// Never use toISOString() for calendar dates — it converts to UTC first,
+// which can shift the date near midnight depending on the user's timezone.
 
-function getPreviousMonday(date: Date): string {
-  const currentMonday = new Date(getLastMonday(date));
-  currentMonday.setDate(currentMonday.getDate() - 7);
-  return currentMonday.toISOString().split("T")[0];
-}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -103,14 +92,7 @@ export default function Home() {
       const testDate = currentDateTime;
       setWeekStart(getLastMonday(testDate));
 
-      const day = testDate.getDay();
-      const hour = testDate.getHours();
-      const isSat = day === 6;
-      const isSun = day === 0;
-      const isAfter9AM = hour >= 9;
-      const isBeforeMidnight = hour < 24;
-      const voting = (isSat && isAfter9AM) || (isSun && isBeforeMidnight);
-      setIsVotingPhase(voting);
+      setIsVotingPhase(isVotingOpen(testDate));
     }
   }, [currentDateTime, serverTime]);
 
