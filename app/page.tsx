@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
-import { getLastMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
+import { getLastMonday, getNextMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
 
@@ -90,8 +90,15 @@ export default function Home() {
     } else {
       // In production, use the live current time
       const testDate = currentDateTime;
-      setWeekStart(getLastMonday(testDate));
+     const votingOpen = isVotingOpen(testDate);
 
+setIsVotingPhase(votingOpen);
+
+      setWeekStart(
+        votingOpen
+          ? getNextMonday(testDate)
+          : getLastMonday(testDate)
+      );
       setIsVotingPhase(isVotingOpen(testDate));
     }
   }, [currentDateTime, serverTime]);
