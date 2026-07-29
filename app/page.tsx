@@ -289,9 +289,13 @@ export default function Home() {
           {/* Last Week Gain */}
           <div className="alert alert-info mb-2">
             Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
+            <br />
+            <small className="text-muted">(Week of {getPreviousMonday(currentDateTime)})</small>
           </div>
           <div className="alert alert-secondary">
             Current Week Change: <strong>{currentWeekGain !== null ? (currentWeekGain >= 0 ? "+" : "") + currentWeekGain.toFixed(2) + "%" : "—"}</strong>
+            <br />
+            <small className="text-muted">(Since {getLastMonday(currentDateTime)})</small>
           </div>
 
           {/* Add Stock */}
