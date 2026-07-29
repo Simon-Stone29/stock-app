@@ -2,7 +2,7 @@ import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
-import { getLastMonday, getZonedDateString } from "../lib/weekDates.ts";
+import { getPreviousMonday, getZonedDateString } from "../lib/weekDates.ts";
 
 dotenv.config({ path: ".env.local" });
 
@@ -107,7 +107,7 @@ async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<numbe
 async function main() {
   const referenceDate = getSimulationDate();
   const TODAY = getZonedDateString(referenceDate);
-  const WEEK_START = getLastMonday(referenceDate);
+  const WEEK_START = getPreviousMonday(referenceDate);
 
   console.log(`\n📊 Daily Price Update`);
   console.log(`   Today: ${TODAY}`);

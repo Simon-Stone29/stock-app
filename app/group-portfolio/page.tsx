@@ -85,6 +85,8 @@ export default function GroupPortfolio() {
           <p className="text-muted mb-1">Week of {weekStart}</p>
           <p className="text-muted small">
             Current Group Change: <strong>{groupPerformance !== null ? (groupPerformance >= 0 ? "+" : "") + groupPerformance.toFixed(2) + "%" : "—"}</strong>
+            <br />
+            <small>(Since Monday {weekStart})</small>
           </p>
         </div>
       )}

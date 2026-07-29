@@ -5,6 +5,7 @@ import { supabase } from "@/src/lib/supabase";
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdateDate, setLastUpdateDate] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -34,6 +35,17 @@ export default function Leaderboard() {
 
         console.log("Score map:", scoreMap);
 
+        // Find the most recent week_start from scores
+        const latestWeekStart = scores?.length
+          ? scores.reduce((latest, score) =>
+              score.week_start > latest ? score.week_start : latest,
+              scores[0].week_start
+            )
+          : null;
+
+        setLastUpdateDate(latestWeekStart);
+        console.log("Latest score update:", latestWeekStart);
+
         // Combine and sort
         const combined = users
           ?.map((user) => ({
@@ -59,7 +71,14 @@ export default function Leaderboard() {
 
   return (
     <div className="container mt-4">
-      <h1 className="mb-4">Leaderboard</h1>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h1>Leaderboard</h1>
+        {lastUpdateDate && (
+          <small className="text-muted">
+            Scores updated as of: {lastUpdateDate}
+          </small>
+        )}
+      </div>
       <div className="card">
         <div className="card-body">
           <table className="table">
