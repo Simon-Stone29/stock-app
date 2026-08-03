@@ -11,7 +11,7 @@ export function AppNavbar() {
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container">
         <Link className="navbar-brand fw-semibold" href="/">
-          Stock App
+          Alpha Pool
         </Link>
         <div className="navbar-nav ms-auto">
           {links.map((link) => (
