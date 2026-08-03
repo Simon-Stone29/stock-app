@@ -254,7 +254,7 @@ export default function Home() {
     <div className="container mt-4">
       {!user && (
         <div className="text-center py-4">
-          <h1>Stock Picker</h1>
+          <h1>AlphaPool</h1>
           <button className="btn btn-primary mt-3" onClick={login}>
             Login with Google
           </button>
@@ -264,7 +264,7 @@ export default function Home() {
       {user && (
         <>
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h1 className="h3">Stock Picker</h1>
+            <h1 className="mb-4">My Picks</h1>
             <span className="text-muted small">{user.email}</span>
           </div>
 
