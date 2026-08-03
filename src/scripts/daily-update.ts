@@ -18,9 +18,9 @@ const supabase = createClient(
 /**
  * DAILY UPDATE SCRIPT
  *
- * Purpose: Fetch current prices and update daily performance tracking
+ * Purpose: Fetch current prices and update daily performance tracking + user scores
  * Run: Every weekday during/after market hours (e.g., 5 PM ET)
- * Does NOT update scores - just updates current price data for display
+ * Updates stock prices AND calculates/updates user scores for current week
  *
  * NOTE: Week/date calculations use src/lib/weekDates.ts (America/New_York)
  * so this script agrees with the client and the /api/time-context route
@@ -205,8 +205,8 @@ async function main() {
     }
   }
 
-  // 4. Calculate current performance (no score updates)
-  console.log(`\n💰 Current Week Performance (unrealized)`);
+  // 4. Calculate current performance and update scores
+  console.log(`\n💰 Current Week Performance & Score Updates`);
 
   const { data: currentPrices } = await supabase
     .from("stock_prices")
@@ -225,7 +225,19 @@ async function main() {
     byUser[pick.user_id].push(pick);
   }
 
-  // Calculate each user's current return
+  // Get each user's latest score
+  const { data: latestScores } = await supabase
+    .from("scores")
+    .select("user_id, competence_score")
+    .in("user_id", Object.keys(byUser))
+    .order("week_start", { ascending: false });
+
+  const scoreMap: Record<string, number> = {};
+  latestScores?.forEach(s => {
+    if (!scoreMap[s.user_id]) scoreMap[s.user_id] = s.competence_score;
+  });
+
+  // Calculate each user's current return and update score
   for (const [user_id, userPicks] of Object.entries(byUser)) {
     let weeklyReturn = 0;
 
@@ -237,10 +249,31 @@ async function main() {
       weeklyReturn += stockReturn * (pick.percentage / 100);
     }
 
-    console.log(`  User ${user_id.substring(0, 8)}: ${(weeklyReturn * 100).toFixed(2)}% (unrealized)`);
+    const startingScore = scoreMap[user_id] ?? 1000;
+    const delta = weeklyReturn * 100; // SENSITIVITY = 100
+    const newScore = startingScore + delta;
+
+    console.log(`  User ${user_id.substring(0, 8)}:`);
+    console.log(`    Weekly return: ${(weeklyReturn * 100).toFixed(2)}%`);
+    console.log(`    Starting score: ${startingScore.toFixed(0)}`);
+    console.log(`    Score delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(0)}`);
+    console.log(`    New score: ${newScore.toFixed(0)}`);
+
+    // Upsert score for this week
+    const { error: scoreError } = await supabase
+      .from("scores")
+      .upsert({
+        user_id,
+        week_start: WEEK_START,
+        competence_score: newScore,
+      }, { onConflict: "user_id,week_start" });
+
+    if (scoreError) {
+      console.error(`🧪 Daily update debug: failed to upsert score for user ${user_id.substring(0, 8)}`, { scoreError });
+    }
   }
 
-  console.log("\n✅ Daily update complete.");
+  console.log("\n✅ Daily update complete - prices and scores updated.");
 }
 
 main().catch(console.error);
