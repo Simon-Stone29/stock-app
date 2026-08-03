@@ -205,6 +205,67 @@ async function main() {
     }
   }
 
+  // 4. Calculate and store group portfolio weighted by user scores
+  console.log(`\n🎯 Calculating Weighted Group Portfolio`);
+
+  // Get latest scores for all users with picks
+  const userIds = [...new Set(picks.map(p => p.user_id))];
+  const { data: latestScores } = await supabase
+    .from("scores")
+    .select("user_id, competence_score")
+    .in("user_id", userIds)
+    .order("week_start", { ascending: false });
+
+  const scoreMap: Record<string, number> = {};
+  latestScores?.forEach(s => {
+    if (!scoreMap[s.user_id]) scoreMap[s.user_id] = s.competence_score;
+  });
+
+  // Calculate max score for normalization
+  const maxScore = Math.max(...Object.values(scoreMap), 1000);
+  const contributions: Record<string, number> = {};
+
+  // Weight each pick by user's normalized score
+  for (const pick of picks) {
+    const userScore = scoreMap[pick.user_id] ?? 1000;
+    const normalized = userScore / maxScore;
+    const contribution = normalized * (pick.percentage || 0);
+    contributions[pick.symbol] = (contributions[pick.symbol] || 0) + contribution;
+  }
+
+  const totalContribution = Object.values(contributions).reduce((a, b) => a + b, 0);
+
+  // Convert to percentages and store in database
+  const portfolioEntries = Object.entries(contributions)
+    .map(([symbol, contrib]) => ({
+      symbol,
+      week_start: WEEK_START,
+      percentage: (contrib / totalContribution) * 100,
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
+
+  console.log(`\n📊 Group Portfolio Allocations:`);
+  for (const entry of portfolioEntries) {
+    console.log(`  ${entry.symbol}: ${entry.percentage.toFixed(1)}%`);
+  }
+
+  // Delete old portfolio entries for this week (if re-running)
+  await supabase
+    .from("weekly_portfolio")
+    .delete()
+    .eq("week_start", WEEK_START);
+
+  // Insert new portfolio
+  const { error: portfolioError } = await supabase
+    .from("weekly_portfolio")
+    .insert(portfolioEntries);
+
+  if (portfolioError) {
+    console.error(`🧪 Weekly finalize debug: failed to insert weekly_portfolio`, { portfolioError });
+  } else {
+    console.log(`\n✅ Inserted ${portfolioEntries.length} entries into weekly_portfolio`);
+  }
+
   console.log("\n✅ Weekly finalize complete - group portfolio initialized.");
 }
 
