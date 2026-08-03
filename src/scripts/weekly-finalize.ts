@@ -2,7 +2,7 @@ import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
-import { getPreviousMonday, getZonedDateString } from "../lib/weekDates.ts";
+import { getLastMonday, getZonedDateString } from "../lib/weekDates.ts";
 
 dotenv.config({ path: ".env.local" });
 
@@ -16,11 +16,11 @@ const supabase = createClient(
 );
 
 /**
- * DAILY UPDATE SCRIPT
+ * WEEKLY FINALIZE SCRIPT
  *
- * Purpose: Fetch current prices and update daily performance tracking
- * Run: Every weekday during/after market hours (e.g., 5 PM ET)
- * Does NOT update scores - just updates current price data for display
+ * Purpose: Initialize group portfolio for the new week starting Monday
+ * Run: Monday morning (after picks close Sunday night)
+ * Does NOT update scores - that's handled by daily-update.ts
  *
  * NOTE: Week/date calculations use src/lib/weekDates.ts (America/New_York)
  * so this script agrees with the client and the /api/time-context route
@@ -107,11 +107,11 @@ async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<numbe
 async function main() {
   const referenceDate = getSimulationDate();
   const TODAY = getZonedDateString(referenceDate);
-  const WEEK_START = getPreviousMonday(referenceDate);
+  const WEEK_START = getLastMonday(referenceDate);
 
-  console.log(`\n📊 Daily Price Update`);
+  console.log(`\n📊 Weekly Finalize - Group Portfolio Setup`);
   console.log(`   Today: ${TODAY}`);
-  console.log(`   Current week starts: ${WEEK_START}`);
+  console.log(`   New week starts: ${WEEK_START}`);
   if (isSimulationMode()) console.log(`   [SIMULATION MODE]`);
 
   // 1. Get all picks for current week
@@ -120,7 +120,7 @@ async function main() {
     .select("symbol, user_id, percentage")
     .eq("week_start", WEEK_START);
 
-  console.log(`\n🧪 Daily update debug: fetched weekly_picks for ${WEEK_START}`, {
+  console.log(`\n🧪 Weekly finalize debug: fetched weekly_picks for ${WEEK_START}`, {
     picksError,
     picksCount: picks?.length ?? 0,
   });
@@ -139,7 +139,7 @@ async function main() {
     .select("symbol, open_price")
     .eq("week_start", WEEK_START);
 
-  console.log(`🧪 Daily update debug: loaded existing stock_prices for ${WEEK_START}`, {
+  console.log(`🧪 Weekly finalize debug: loaded existing stock_prices for ${WEEK_START}`, {
     openPricesError,
     openPricesCount: openPrices?.length ?? 0,
   });
@@ -166,12 +166,12 @@ async function main() {
         }, { onConflict: "symbol,week_start" });
 
         if (upsertError) {
-          console.error(`🧪 Daily update debug: failed upsert for ${symbol}`, { WEEK_START, openData, upsertError });
+          console.error(`🧪 Weekly finalize debug: failed upsert for ${symbol}`, { WEEK_START, openData, upsertError });
         } else {
-          console.log(`🧪 Daily update debug: upserted stock_prices for ${symbol}`, { WEEK_START, openData });
+          console.log(`🧪 Weekly finalize debug: upserted stock_prices for ${symbol}`, { WEEK_START, openData });
         }
       } else {
-        console.warn(`🧪 Daily update debug: no openData for ${symbol} on or after ${WEEK_START}`);
+        console.warn(`🧪 Weekly finalize debug: no openData for ${symbol} on or after ${WEEK_START}`);
       }
     }
 
@@ -196,51 +196,16 @@ async function main() {
         .eq("week_start", WEEK_START);
 
       if (updateError) {
-        console.error(`🧪 Daily update debug: failed update close_price for ${symbol}`, { WEEK_START, TODAY, updateError });
+        console.error(`🧪 Weekly finalize debug: failed update close_price for ${symbol}`, { WEEK_START, TODAY, updateError });
       }
     } else if (!currentPrice) {
-      console.warn(`🧪 Daily update debug: no currentPrice found for ${symbol}`, { WEEK_START, TODAY });
+      console.warn(`🧪 Weekly finalize debug: no currentPrice found for ${symbol}`, { WEEK_START, TODAY });
     } else if (!openPriceMap[symbol]) {
-      console.warn(`🧪 Daily update debug: no openPriceMap entry for ${symbol} while updating current price`, { WEEK_START });
+      console.warn(`🧪 Weekly finalize debug: no openPriceMap entry for ${symbol} while updating current price`, { WEEK_START });
     }
   }
 
-  // 4. Calculate current performance (no score updates)
-  console.log(`\n💰 Current Week Performance (unrealized)`);
-
-  const { data: currentPrices } = await supabase
-    .from("stock_prices")
-    .select("symbol, open_price, close_price")
-    .eq("week_start", WEEK_START);
-
-  const priceMap: Record<string, { open: number; close: number }> = {};
-  currentPrices?.forEach(p => {
-    priceMap[p.symbol] = { open: p.open_price, close: p.close_price };
-  });
-
-  // Group picks by user
-  const byUser: Record<string, { symbol: string; percentage: number }[]> = {};
-  for (const pick of picks) {
-    if (!byUser[pick.user_id]) byUser[pick.user_id] = [];
-    byUser[pick.user_id].push(pick);
-  }
-
-  // Calculate each user's current return
-  for (const [user_id, userPicks] of Object.entries(byUser)) {
-    let weeklyReturn = 0;
-
-    for (const pick of userPicks) {
-      const prices = priceMap[pick.symbol];
-      if (!prices || prices.open === 0) continue;
-
-      const stockReturn = (prices.close - prices.open) / prices.open;
-      weeklyReturn += stockReturn * (pick.percentage / 100);
-    }
-
-    console.log(`  User ${user_id.substring(0, 8)}: ${(weeklyReturn * 100).toFixed(2)}% (unrealized)`);
-  }
-
-  console.log("\n✅ Daily update complete.");
+  console.log("\n✅ Weekly finalize complete - group portfolio initialized.");
 }
 
 main().catch(console.error);
