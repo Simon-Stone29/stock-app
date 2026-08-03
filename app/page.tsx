@@ -92,7 +92,9 @@ export default function Home() {
       const testDate = currentDateTime;
     const votingOpen = isVotingOpen(testDate);
     setIsVotingPhase(votingOpen);
-    setWeekStart(getNextMonday(testDate)); // Always next Monday
+    // During voting: show next week's picks (what you're submitting for)
+    // After voting: show current week's picks (what's active now)
+    setWeekStart(votingOpen ? getNextMonday(testDate) : getLastMonday(testDate));
     }
   }, [currentDateTime, serverTime]);
 
