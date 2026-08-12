@@ -10,9 +10,9 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Get users
+        // Public profile view: exposes only id + username, keeps email private.
         const { data: users, error: usersError } = await supabase
-          .from("users")
+          .from("user_profiles")
           .select("id, username");
 
         console.log("Users:", users, usersError);

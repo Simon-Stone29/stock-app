@@ -1,5 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 import { createClient } from "@supabase/supabase-js";
+
 import * as dotenv from "dotenv";
 import { getSimulationDate, isSimulationMode } from "../config/simulation.ts";
 import { getLastMonday, getZonedDateString } from "../lib/weekDates.ts";
