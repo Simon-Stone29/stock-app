@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import { getLastMonday, getNextMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
+import UsernameSetupModal from "@/src/components/UsernameSetupModal";
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
 
@@ -21,6 +22,7 @@ export default function Home() {
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
   const [currentWeekGain, setCurrentWeekGain] = useState<number | null>(null);
   const [serverTime, setServerTime] = useState<any>(null);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
 
   useEffect(() => {
     setCurrentDateTime(new Date());
@@ -35,10 +37,31 @@ export default function Home() {
       setUser(nextUser);
 
       if (nextUser) {
-        await supabase.from("users").upsert(
-          { id: nextUser.id, email: nextUser.email },
-          { onConflict: "id" }
-        );
+        // Check if user exists in database
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("username")
+          .eq("id", nextUser.id)
+          .single();
+
+        if (!existingUser) {
+          // New user - generate random username and show modal
+          const randomUsername = await generateUniqueUsername();
+          await supabase.from("users").insert({
+            id: nextUser.id,
+            email: nextUser.email,
+            username: randomUsername,
+          });
+          setShowUsernameModal(true);
+        } else if (!existingUser.username) {
+          // Existing user without username (migration case)
+          const randomUsername = await generateUniqueUsername();
+          await supabase
+            .from("users")
+            .update({ username: randomUsername })
+            .eq("id", nextUser.id);
+          setShowUsernameModal(true);
+        }
       }
     };
 
@@ -192,6 +215,45 @@ export default function Home() {
   }, [user, weekStart, picks]);
 
 
+  const generateUniqueUsername = async (): Promise<string> => {
+    while (true) {
+      const randomNum = Math.floor(10000 + Math.random() * 90000);
+      const username = `Trader_${randomNum}`;
+
+      const { data } = await supabase
+        .from("users")
+        .select("id")
+        .eq("username", username)
+        .single();
+
+      if (!data) return username;
+    }
+  };
+
+  const handleUsernameSubmit = async (username: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("users")
+      .update({ username })
+      .eq("id", user.id);
+
+    if (error) {
+      if (error.code === "23505") {
+        alert("Username already taken. Please choose another.");
+        return;
+      }
+      alert("Error setting username. Please try again.");
+      return;
+    }
+
+    setShowUsernameModal(false);
+  };
+
+  const handleUsernameSkip = () => {
+    setShowUsernameModal(false);
+  };
+
   const login = () => {
     const redirectTo = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : undefined;
 
@@ -254,6 +316,13 @@ export default function Home() {
 
   return (
     <div className="container mt-4">
+      {showUsernameModal && (
+        <UsernameSetupModal
+          onSubmit={handleUsernameSubmit}
+          onSkip={handleUsernameSkip}
+        />
+      )}
+
       {!user && (
         <div className="text-center py-4">
           <h1>AlphaPool</h1>

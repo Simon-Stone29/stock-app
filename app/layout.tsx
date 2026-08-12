@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AppNavbar } from "@/src/components/AppNavbar";
 
 export const metadata: Metadata = {
-  title: "Stock App",
+  title: "AlphaPool",
 };
 
 export default function RootLayout({

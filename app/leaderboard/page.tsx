@@ -13,8 +13,8 @@ export default function Leaderboard() {
         // Get users
         const { data: users, error: usersError } = await supabase
           .from("users")
-          .select("id, email");
-        
+          .select("id, username");
+
         console.log("Users:", users, usersError);
 
         // Get latest score for each user
@@ -50,7 +50,7 @@ export default function Leaderboard() {
         const combined = users
           ?.map((user) => ({
             user_id: user.id,
-            email: user.email,
+            username: user.username,
             competence_score: scoreMap[user.id] ?? 0,
           }))
           .sort((a, b) => b.competence_score - a.competence_score);
@@ -85,7 +85,7 @@ export default function Leaderboard() {
             <thead>
               <tr>
                 <th style={{ width: "60px" }}>Rank</th>
-                <th>Email</th>
+                <th>Username</th>
                 <th style={{ width: "150px" }}>Score</th>
               </tr>
             </thead>
@@ -93,7 +93,7 @@ export default function Leaderboard() {
               {leaderboard.map((entry, index) => (
                 <tr key={entry.user_id}>
                   <td className="fw-bold">#{index + 1}</td>
-                  <td>{entry.email}</td>
+                  <td>{entry.username || "Anonymous"}</td>
                   <td>{entry.competence_score.toFixed(0)}</td>
                 </tr>
               ))}
