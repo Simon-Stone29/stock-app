@@ -192,8 +192,27 @@ export default function GroupPortfolio() {
         </div>
       )}
 
-      {/* Performance chart */}
       <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Allocations</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-border p-0">
+          {portfolio.map((p) => (
+            <div key={p.symbol} className="flex items-center justify-between px-5 py-3">
+              <span className="text-sm">
+                <span className="font-medium">{p.symbol}</span>
+                <span className="text-muted-foreground"> — {stocks[p.symbol]}</span>
+              </span>
+              <span className="tabular-nums text-sm text-muted-foreground">
+                {p.percentage.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Performance chart */}
+      <Card>
         <CardHeader>
           <CardTitle>Portfolio performance</CardTitle>
         </CardHeader>
@@ -242,25 +261,6 @@ export default function GroupPortfolio() {
           ) : (
             <p className="text-sm text-muted-foreground">No portfolio history yet for the group.</p>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Allocations</CardTitle>
-        </CardHeader>
-        <CardContent className="divide-y divide-border p-0">
-          {portfolio.map((p) => (
-            <div key={p.symbol} className="flex items-center justify-between px-5 py-3">
-              <span className="text-sm">
-                <span className="font-medium">{p.symbol}</span>
-                <span className="text-muted-foreground"> — {stocks[p.symbol]}</span>
-              </span>
-              <span className="tabular-nums text-sm text-muted-foreground">
-                {p.percentage.toFixed(1)}%
-              </span>
-            </div>
-          ))}
         </CardContent>
       </Card>
     </div>
