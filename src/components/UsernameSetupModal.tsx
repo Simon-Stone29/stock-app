@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Button } from "@/src/components/ui/button";
 
 interface UsernameSetupModalProps {
   onSubmit: (username: string) => void;
@@ -38,49 +39,34 @@ export default function UsernameSetupModal({ onSubmit, onSkip }: UsernameSetupMo
 
   return (
     <div
-      className="modal show d-block"
-      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
       tabIndex={-1}
     >
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">Choose a Display Name</h5>
-          </div>
-          <div className="modal-body">
-            <p className="text-muted mb-3">
-              This will be shown on the leaderboard instead of your email.
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter username (or skip for random)"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              autoFocus
-            />
-            {error && <div className="text-danger small mt-2">{error}</div>}
-          </div>
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onSkip}
-            >
-              Skip (Random Name)
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleSubmit}
-            >
-              Set Username
-            </button>
-          </div>
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold">Choose a display name</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          This will be shown on the leaderboard instead of your email.
+        </p>
+
+        <input
+          type="text"
+          className="mt-4 h-10 w-full rounded-lg border border-border bg-muted px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          placeholder="Enter username (or skip for random)"
+          value={username}
+          onChange={(e) => {
+            setUsername(e.target.value);
+            setError("");
+          }}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          autoFocus
+        />
+        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={onSkip}>
+            Skip (random name)
+          </Button>
+          <Button onClick={handleSubmit}>Set username</Button>
         </div>
       </div>
     </div>
