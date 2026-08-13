@@ -8,9 +8,17 @@ export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdateDate, setLastUpdateDate] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      // get signed-in user id (if any) to highlight on the leaderboard
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUserId(user?.id ?? null);
+      } catch (err) {
+        // ignore - not signed in or no session
+      }
       try {
         const { data: users, error: usersError } = await supabase
           .from("user_profiles")
@@ -88,10 +96,14 @@ export default function Leaderboard() {
             const rank = index + 1;
             const topThree = rank <= 3;
             return (
-              <div
-                key={entry.user_id}
-                className="flex items-center justify-between px-5 py-3"
-              >
+                <div
+                  key={entry.user_id}
+                  className={cn(
+                    "flex items-center justify-between px-5 py-3",
+                    entry.user_id === currentUserId ? "rounded-lg" : ""
+                  )}
+                  style={entry.user_id === currentUserId ? { background: "rgba(11,92,255,0.06)" } : undefined}
+                >
                 <div className="flex items-center gap-3">
                   <span
                     className={cn(
@@ -101,13 +113,13 @@ export default function Leaderboard() {
                   >
                     #{rank}
                   </span>
-                  <span className="text-sm font-medium">
-                    {entry.username || "Anonymous"}
-                  </span>
+                    <span className={cn("text-sm font-medium", entry.user_id === currentUserId ? "text-white" : "") }>
+                      {entry.username || "Anonymous"}
+                    </span>
                 </div>
-                <span className="tabular-nums text-sm text-muted-foreground">
-                  {entry.competence_score.toFixed(0)}
-                </span>
+                  <span className={cn("tabular-nums text-sm", entry.user_id === currentUserId ? "text-white font-semibold" : "text-muted-foreground")}>
+                    {entry.competence_score.toFixed(0)}
+                  </span>
               </div>
             );
           })}
