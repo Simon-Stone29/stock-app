@@ -44,6 +44,7 @@ export default function Home() {
   const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_change_pct: number }[]>([]);
   const [serverTime, setServerTime] = useState<any>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [portfolioBalance, setPortfolioBalance] = useState<number>(1000);
 
   useEffect(() => {
     setCurrentDateTime(new Date());
@@ -148,6 +149,7 @@ export default function Home() {
   useEffect(() => {
     if (!user) {
       setPortfolioHistory([]);
+      setPortfolioBalance(1000);
       return;
     }
 
@@ -166,7 +168,20 @@ export default function Home() {
       );
     };
 
+    const fetchPortfolioBalance = async () => {
+      const { data } = await supabase
+        .from("scores")
+        .select("competence_score")
+        .eq("user_id", user.id)
+        .order("week_start", { ascending: false })
+        .limit(1)
+        .single();
+
+      setPortfolioBalance(data?.competence_score ?? 1000);
+    };
+
     void fetchPortfolioHistory();
+    void fetchPortfolioBalance();
   }, [user]);
 
   useEffect(() => {
@@ -391,6 +406,24 @@ export default function Home() {
         <Badge variant={isVotingPhase ? "success" : "outline"}>
           {isVotingPhase ? "Voting open" : "Voting locked"}
         </Badge>
+      </div>
+
+      {/* Portfolio Balance */}
+      <div className="mb-6">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Portfolio Balance
+        </div>
+        <div className="mt-1 flex items-baseline gap-3">
+          <div className="text-4xl font-semibold tabular-nums">
+            ${portfolioBalance.toFixed(0)}
+          </div>
+          <div className={cn(
+            "text-lg tabular-nums",
+            (portfolioBalance - 1000) >= 0 ? "text-success" : "text-destructive"
+          )}>
+            {(portfolioBalance - 1000) >= 0 ? "+" : ""}${(portfolioBalance - 1000).toFixed(0)}
+          </div>
+        </div>
       </div>
 
       {/* Stat row */}

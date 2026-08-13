@@ -9,6 +9,7 @@ export default function GroupPortfolio() {
   const [stocks, setStocks] = useState<any>({});
   const [weekStart, setWeekStart] = useState<string>("");
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
+  const [groupBalance, setGroupBalance] = useState<number>(0);
 
   useEffect(() => {
     fetch("/api/time-context")
@@ -38,6 +39,35 @@ export default function GroupPortfolio() {
 
     fetchPortfolio();
   }, [weekStart]);
+
+  useEffect(() => {
+    const fetchGroupBalance = async () => {
+      // Get latest score for all users
+      const { data: scores } = await supabase
+        .from("scores")
+        .select("user_id, competence_score, week_start")
+        .order("week_start", { ascending: false });
+
+      if (!scores?.length) {
+        setGroupBalance(0);
+        return;
+      }
+
+      // Get latest score per user
+      const userLatestScores: Record<string, number> = {};
+      scores.forEach(s => {
+        if (!userLatestScores[s.user_id]) {
+          userLatestScores[s.user_id] = s.competence_score;
+        }
+      });
+
+      // Sum all user balances
+      const totalBalance = Object.values(userLatestScores).reduce((sum, score) => sum + score, 0);
+      setGroupBalance(totalBalance);
+    };
+
+    fetchGroupBalance();
+  }, []);
 
   useEffect(() => {
     if (!weekStart || !portfolio.length) {
@@ -83,6 +113,24 @@ export default function GroupPortfolio() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold tracking-tight">Group Portfolio</h1>
+
+      {/* Group Balance */}
+      <div className="mb-6">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Group Total
+        </div>
+        <div className="mt-1 flex items-baseline gap-3">
+          <div className="text-4xl font-semibold tabular-nums">
+            ${groupBalance.toFixed(0)}
+          </div>
+          <div className={cn(
+            "text-lg tabular-nums",
+            (groupBalance - (1000 * (groupBalance > 0 ? Math.round(groupBalance / 1000) : 0))) >= 0 ? "text-success" : "text-destructive"
+          )}>
+            Total across all players
+          </div>
+        </div>
+      </div>
 
       {weekStart && (
         <div className="mb-8">

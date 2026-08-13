@@ -45,7 +45,7 @@ export default function Leaderboard() {
           ?.map((user) => ({
             user_id: user.id,
             username: user.username,
-            competence_score: scoreMap[user.id] ?? 0,
+            competence_score: scoreMap[user.id] ?? 1000,
           }))
           .sort((a, b) => b.competence_score - a.competence_score);
 
@@ -87,6 +87,8 @@ export default function Leaderboard() {
           {leaderboard.map((entry, index) => {
             const rank = index + 1;
             const topThree = rank <= 3;
+            const balance = entry.competence_score;
+            const totalGained = balance - 1000;
             return (
               <div
                 key={entry.user_id}
@@ -105,9 +107,17 @@ export default function Leaderboard() {
                     {entry.username || "Anonymous"}
                   </span>
                 </div>
-                <span className="tabular-nums text-sm text-muted-foreground">
-                  {entry.competence_score.toFixed(0)}
-                </span>
+                <div className="text-right">
+                  <div className="tabular-nums text-sm font-semibold">
+                    ${balance.toFixed(0)}
+                  </div>
+                  <div className={cn(
+                    "tabular-nums text-xs",
+                    totalGained >= 0 ? "text-success" : "text-destructive"
+                  )}>
+                    {totalGained >= 0 ? "+" : ""}${totalGained.toFixed(0)}
+                  </div>
+                </div>
               </div>
             );
           })}
