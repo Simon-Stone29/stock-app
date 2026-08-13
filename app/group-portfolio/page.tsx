@@ -192,46 +192,58 @@ export default function GroupPortfolio() {
         </div>
       )}
 
-      {/* Performance Chart */}
-      {portfolioHistory.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Performance History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={portfolioHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="snapshot_date"
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                  tickFormatter={(val) => new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                />
-                <YAxis
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                  tickFormatter={(val) => `${val.toFixed(1)}%`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                  }}
-                  labelFormatter={(val) => new Date(val).toLocaleDateString()}
-                  formatter={(val: number) => [`${val.toFixed(2)}%`, "Change"]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="portfolio_change_pct"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+      {/* Performance chart */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Portfolio performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {portfolioHistory.length > 0 ? (
+            <div style={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer>
+                <LineChart data={portfolioHistory} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="snapshot_date"
+                    tickFormatter={(value: string) => value.slice(5)}
+                    minTickGap={24}
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                  />
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    domain={[
+                      (dataMin: number) => Math.min(dataMin, -5),
+                      (dataMax: number) => Math.max(dataMax, 5),
+                    ]}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(value) => [`${Number(value ?? 0).toFixed(2)}%`, "Change"]}
+                    labelFormatter={(label) => `Day ${String(label)}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="portfolio_change_pct"
+                    stroke="var(--primary)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: "var(--primary)" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No portfolio history yet for the group.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
