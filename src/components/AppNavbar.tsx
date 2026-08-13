@@ -3,8 +3,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/src/lib/utils";
-import { Sheet, SheetContent, SheetTrigger } from "@/src/components/ui/sheet";
-import { Menu } from "lucide-react";
 
 const links = [
   { href: "/", label: "My Picks" },
@@ -15,7 +13,7 @@ const links = [
 
 export function AppNavbar() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
@@ -26,56 +24,61 @@ export function AppNavbar() {
         
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-1">
-          {links.map((link) => (
-            <NavLink key={link.href} link={link} pathname={pathname} />
-          ))}
+          {links.map((link) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-md px-2 py-1 text-sm transition-colors",
+                  active
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
 
-        {/* Mobile Nav */}
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild className="md:hidden">
-            <button className="p-2">
-              <Menu className="h-6 w-6" />
-            </button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <div className="flex flex-col gap-4 mt-8">
-              {links.map((link) => (
+        {/* Mobile Menu Button */}
+        <button
+          className="md:hidden p-2 rounded-md hover:bg-muted"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span className="block w-5 h-0.5 bg-foreground mb-1.5"></span>
+          <span className="block w-5 h-0.5 bg-foreground mb-1.5"></span>
+          <span className="block w-5 h-0.5 bg-foreground"></span>
+        </button>
+      </div>
+
+      {/* Mobile Nav Menu */}
+      {isOpen && (
+        <div className="md:hidden border-t border-border bg-background">
+          <div className="flex flex-col gap-0 px-4 py-2">
+            {links.map((link) => {
+              const active = pathname === link.href;
+              return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setOpen(false)}
+                  onClick={() => setIsOpen(false)}
                   className={cn(
-                    "text-lg transition-colors",
-                    pathname === link.href
-                      ? "font-semibold text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    "px-2 py-2 rounded-md transition-colors",
+                    active
+                      ? "bg-muted text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
                   {link.label}
                 </Link>
-              ))}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-    </nav>
-  );
-}
-
-function NavLink({ link, pathname }: { link: typeof links[0]; pathname: string }) {
-  const active = pathname === link.href;
-  return (
-    <Link
-      href={link.href}
-      className={cn(
-        "rounded-md px-2 py-1 text-sm transition-colors",
-        active
-          ? "bg-muted text-foreground"
-          : "text-muted-foreground hover:text-foreground"
+              );
+            })}
+          </div>
+        </div>
       )}
-    >
-      {link.label}
-    </Link>
+    </nav>
   );
 }
