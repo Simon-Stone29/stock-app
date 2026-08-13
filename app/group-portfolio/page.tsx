@@ -1,5 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { supabase } from "@/src/lib/supabase";
 import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
 import { cn } from "@/src/lib/utils";
@@ -11,6 +20,7 @@ export default function GroupPortfolio() {
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
   const [groupBalance, setGroupBalance] = useState<number>(0);
   const [userCount, setUserCount] = useState<number>(0);
+  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_change_pct: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/time-context")
@@ -72,6 +82,24 @@ export default function GroupPortfolio() {
     };
 
     fetchGroupBalance();
+  }, []);
+
+  useEffect(() => {
+    const fetchPortfolioHistory = async () => {
+      const { data } = await supabase
+        .from("group_portfolio_daily")
+        .select("snapshot_date, portfolio_change_pct")
+        .order("snapshot_date", { ascending: true });
+
+      setPortfolioHistory(
+        (data ?? []).map((row) => ({
+          snapshot_date: row.snapshot_date,
+          portfolio_change_pct: Number(row.portfolio_change_pct),
+        }))
+      );
+    };
+
+    fetchPortfolioHistory();
   }, []);
 
   useEffect(() => {
@@ -162,6 +190,47 @@ export default function GroupPortfolio() {
             Since Monday {weekStart}
           </div>
         </div>
+      )}
+
+      {/* Performance Chart */}
+      {portfolioHistory.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Performance History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={portfolioHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="snapshot_date"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  tickFormatter={(val) => new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                />
+                <YAxis
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  tickFormatter={(val) => `${val.toFixed(1)}%`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "6px",
+                  }}
+                  labelFormatter={(val) => new Date(val).toLocaleDateString()}
+                  formatter={(val: number) => [`${val.toFixed(2)}%`, "Change"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="portfolio_change_pct"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       )}
 
       <Card>
