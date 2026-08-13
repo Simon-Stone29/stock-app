@@ -260,7 +260,7 @@ async function main() {
     console.log(`    Score delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(0)}`);
     console.log(`    New score: ${newScore.toFixed(0)}`);
 
-    // Upsert score for this week
+    // Upsert weekly score for leaderboard/ranking.
     const { error: scoreError } = await supabase
       .from("scores")
       .upsert({
@@ -270,11 +270,49 @@ async function main() {
       }, { onConflict: "user_id,week_start" });
 
     if (scoreError) {
-      console.error(`🧪 Daily update debug: failed to upsert score for user ${user_id.substring(0, 8)}`, { scoreError });
+      console.error(`🧪 Daily update debug: failed to upsert weekly score for user ${user_id.substring(0, 8)}`, { scoreError });
+    }
+
+    // Store daily percent-change snapshot for graphing.
+    const { error: dailyPortfolioError } = await supabase
+      .from("user_portfolio_daily")
+      .upsert({
+        user_id,
+        snapshot_date: TODAY,
+        week_start: WEEK_START,
+        portfolio_change_pct: weeklyReturn * 100,
+      }, { onConflict: "user_id,snapshot_date" });
+
+    if (dailyPortfolioError) {
+      console.error(`🧪 Daily update debug: failed to upsert daily portfolio snapshot for user ${user_id.substring(0, 8)}`, { dailyPortfolioError });
     }
   }
 
-  console.log("\n✅ Daily update complete - prices and scores updated.");
+  // Aggregate today's user portfolio movements into a group portfolio snapshot.
+  const { data: dailyUserPortfolioValues, error: dailyUserPortfolioError } = await supabase
+    .from("user_portfolio_daily")
+    .select("portfolio_change_pct")
+    .eq("snapshot_date", TODAY);
+
+  if (dailyUserPortfolioError) {
+    console.error("🧪 Daily update debug: failed to fetch user portfolio snapshots for group snapshot", { dailyUserPortfolioError });
+  } else if (dailyUserPortfolioValues?.length) {
+    const groupChangePct = dailyUserPortfolioValues.reduce((sum, row) => sum + Number(row.portfolio_change_pct), 0) / dailyUserPortfolioValues.length;
+
+    const { error: groupDailyError } = await supabase
+      .from("group_portfolio_daily")
+      .upsert({
+        snapshot_date: TODAY,
+        week_start: WEEK_START,
+        portfolio_change_pct: groupChangePct,
+      }, { onConflict: "snapshot_date" });
+
+    if (groupDailyError) {
+      console.error("🧪 Daily update debug: failed to upsert group portfolio snapshot", { groupDailyError });
+    }
+  }
+
+  console.log("\n✅ Daily update complete - prices, weekly scores, and daily portfolio snapshots updated.");
 }
 
 main().catch(console.error);
