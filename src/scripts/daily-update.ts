@@ -288,28 +288,52 @@ async function main() {
     }
   }
 
-  // Aggregate today's user portfolio movements into a group portfolio snapshot.
-  const { data: dailyUserPortfolioValues, error: dailyUserPortfolioError } = await supabase
-    .from("user_portfolio_daily")
-    .select("portfolio_change_pct")
-    .eq("snapshot_date", TODAY);
+  // Aggregate today's group portfolio snapshot using weighted `weekly_portfolio`.
+  // If weekly allocations or price data are missing, skip upserting the group snapshot
+  // and log a clear message (no fallback behavior).
+  try {
+    const { data: weeklyPortfolio, error: wpError } = await supabase
+      .from("weekly_portfolio")
+      .select("symbol, percentage")
+      .eq("week_start", WEEK_START);
 
-  if (dailyUserPortfolioError) {
-    console.error("🧪 Daily update debug: failed to fetch user portfolio snapshots for group snapshot", { dailyUserPortfolioError });
-  } else if (dailyUserPortfolioValues?.length) {
-    const groupChangePct = dailyUserPortfolioValues.reduce((sum, row) => sum + Number(row.portfolio_change_pct), 0) / dailyUserPortfolioValues.length;
+    if (wpError) {
+      console.error("🧪 Daily update debug: failed to fetch weekly_portfolio for group snapshot", { wpError });
+    } else if (!weeklyPortfolio || !weeklyPortfolio.length) {
+      console.log("🧪 Daily update: weekly_portfolio missing for this week — skipping weighted group snapshot.");
+    } else {
+      let weightedReturn = 0;
+      let hasData = false;
 
-    const { error: groupDailyError } = await supabase
-      .from("group_portfolio_daily")
-      .upsert({
-        snapshot_date: TODAY,
-        week_start: WEEK_START,
-        portfolio_change_pct: groupChangePct,
-      }, { onConflict: "snapshot_date" });
+      for (const row of weeklyPortfolio) {
+        const symbol = row.symbol;
+        const weight = Number(row.percentage) || 0; // percent
+        const prices = priceMap[symbol];
+        if (!prices || prices.open === 0) continue;
+        const stockReturn = (prices.close - prices.open) / prices.open;
+        weightedReturn += stockReturn * (weight / 100);
+        hasData = true;
+      }
 
-    if (groupDailyError) {
-      console.error("🧪 Daily update debug: failed to upsert group portfolio snapshot", { groupDailyError });
+      if (!hasData) {
+        console.log("🧪 Daily update: weekly_portfolio exists but no price data available for its symbols — skipping group snapshot.");
+      } else {
+        const groupChangePct = weightedReturn * 100;
+        const { error: groupDailyError } = await supabase
+          .from("group_portfolio_daily")
+          .upsert({
+            snapshot_date: TODAY,
+            week_start: WEEK_START,
+            portfolio_change_pct: groupChangePct,
+          }, { onConflict: "snapshot_date" });
+
+        if (groupDailyError) {
+          console.error("🧪 Daily update debug: failed to upsert group portfolio snapshot", { groupDailyError });
+        }
+      }
     }
+  } catch (err) {
+    console.error("🧪 Daily update debug: error computing weighted group snapshot", err);
   }
 
   console.log("\n✅ Daily update complete - prices, weekly scores, and daily portfolio snapshots updated.");
