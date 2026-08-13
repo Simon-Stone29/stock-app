@@ -421,7 +421,7 @@ export default function Home() {
             "text-lg tabular-nums",
             (portfolioBalance - 1000) >= 0 ? "text-success" : "text-destructive"
           )}>
-            {(portfolioBalance - 1000) >= 0 ? "+" : ""}${(portfolioBalance - 1000).toFixed(0)}
+            {(portfolioBalance - 1000) >= 0 ? "+" : ""}{(((portfolioBalance - 1000) / 1000) * 100).toFixed(1)}%
           </div>
         </div>
       </div>

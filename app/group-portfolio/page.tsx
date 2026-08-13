@@ -10,6 +10,7 @@ export default function GroupPortfolio() {
   const [weekStart, setWeekStart] = useState<string>("");
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
   const [groupBalance, setGroupBalance] = useState<number>(0);
+  const [userCount, setUserCount] = useState<number>(0);
 
   useEffect(() => {
     fetch("/api/time-context")
@@ -42,6 +43,19 @@ export default function GroupPortfolio() {
 
   useEffect(() => {
     const fetchGroupBalance = async () => {
+      // Get all users
+      const { data: users } = await supabase
+        .from("users")
+        .select("id");
+
+      if (!users?.length) {
+        setGroupBalance(0);
+        setUserCount(0);
+        return;
+      }
+
+      setUserCount(users.length);
+
       // Get latest score for all users
       const { data: scores } = await supabase
         .from("scores")
@@ -49,7 +63,7 @@ export default function GroupPortfolio() {
         .order("week_start", { ascending: false });
 
       if (!scores?.length) {
-        setGroupBalance(0);
+        setGroupBalance(1000 * users.length); // Default if no scores yet
         return;
       }
 
@@ -58,6 +72,13 @@ export default function GroupPortfolio() {
       scores.forEach(s => {
         if (!userLatestScores[s.user_id]) {
           userLatestScores[s.user_id] = s.competence_score;
+        }
+      });
+
+      // For users with no score yet, default to 1000
+      users.forEach(u => {
+        if (!userLatestScores[u.id]) {
+          userLatestScores[u.id] = 1000;
         }
       });
 
@@ -123,12 +144,17 @@ export default function GroupPortfolio() {
           <div className="text-4xl font-semibold tabular-nums">
             ${groupBalance.toFixed(0)}
           </div>
-          <div className={cn(
-            "text-lg tabular-nums",
-            (groupBalance - (1000 * (groupBalance > 0 ? Math.round(groupBalance / 1000) : 0))) >= 0 ? "text-success" : "text-destructive"
-          )}>
-            Total across all players
-          </div>
+          {userCount > 0 && (
+            <div className={cn(
+              "text-lg tabular-nums",
+              ((groupBalance / userCount) - 1000) >= 0 ? "text-success" : "text-destructive"
+            )}>
+              {((groupBalance / userCount) - 1000) >= 0 ? "+" : ""}{((((groupBalance / userCount) - 1000) / 1000) * 100).toFixed(1)}%
+            </div>
+          )}
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {userCount} player{userCount !== 1 ? 's' : ''} • Avg ${userCount > 0 ? (groupBalance / userCount).toFixed(0) : '0'} per player
         </div>
       </div>
 
