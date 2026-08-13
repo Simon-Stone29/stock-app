@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppNavbar } from "@/src/components/AppNavbar";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AlphaPool",
@@ -11,14 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-        />
-      </head>
-      <body>
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <AppNavbar />
         {children}
       </body>

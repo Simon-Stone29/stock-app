@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
+import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
+import { cn } from "@/src/lib/utils";
 
 export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -10,14 +12,12 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // Public profile view: exposes only id + username, keeps email private.
         const { data: users, error: usersError } = await supabase
           .from("user_profiles")
           .select("id, username");
 
         console.log("Users:", users, usersError);
 
-        // Get latest score for each user
         const { data: scores, error: scoresError } = await supabase
           .from("scores")
           .select("user_id, competence_score, week_start")
@@ -25,7 +25,6 @@ export default function Leaderboard() {
 
         console.log("Scores:", scores, scoresError);
 
-        // Create score map with only the latest score per user
         const scoreMap: Record<string, number> = {};
         scores?.forEach((score) => {
           if (!scoreMap[score.user_id]) {
@@ -33,9 +32,6 @@ export default function Leaderboard() {
           }
         });
 
-        console.log("Score map:", scoreMap);
-
-        // Find the most recent week_start from scores
         const latestWeekStart = scores?.length
           ? scores.reduce((latest, score) =>
               score.week_start > latest ? score.week_start : latest,
@@ -44,9 +40,7 @@ export default function Leaderboard() {
           : null;
 
         setLastUpdateDate(latestWeekStart);
-        console.log("Latest score update:", latestWeekStart);
 
-        // Combine and sort
         const combined = users
           ?.map((user) => ({
             user_id: user.id,
@@ -55,7 +49,6 @@ export default function Leaderboard() {
           }))
           .sort((a, b) => b.competence_score - a.competence_score);
 
-        console.log("Combined leaderboard:", combined);
         setLeaderboard(combined || []);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
@@ -67,40 +60,59 @@ export default function Leaderboard() {
     fetchLeaderboard();
   }, []);
 
-  if (loading) return <div className="container mt-4">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 text-sm text-muted-foreground">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="container mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h1>Leaderboard</h1>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Leaderboard</h1>
         {lastUpdateDate && (
-          <small className="text-muted">
-            Scores updated as of: {lastUpdateDate}
-          </small>
+          <span className="text-xs text-muted-foreground">
+            Updated as of {lastUpdateDate}
+          </span>
         )}
       </div>
-      <div className="card">
-        <div className="card-body">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: "60px" }}>Rank</th>
-                <th>Username</th>
-                <th style={{ width: "150px" }}>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((entry, index) => (
-                <tr key={entry.user_id}>
-                  <td className="fw-bold">#{index + 1}</td>
-                  <td>{entry.username || "Anonymous"}</td>
-                  <td>{entry.competence_score.toFixed(0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rankings</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-border p-0">
+          {leaderboard.map((entry, index) => {
+            const rank = index + 1;
+            const topThree = rank <= 3;
+            return (
+              <div
+                key={entry.user_id}
+                className="flex items-center justify-between px-5 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "tabular-nums text-sm font-semibold",
+                      topThree ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    #{rank}
+                  </span>
+                  <span className="text-sm font-medium">
+                    {entry.username || "Anonymous"}
+                  </span>
+                </div>
+                <span className="tabular-nums text-sm text-muted-foreground">
+                  {entry.competence_score.toFixed(0)}
+                </span>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
     </div>
   );
 }

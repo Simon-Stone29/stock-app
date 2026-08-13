@@ -1,24 +1,41 @@
+"use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/src/lib/utils";
 
 const links = [
-  { href: "/", label: "Home" },
-  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/", label: "My Picks" },
   { href: "/group-portfolio", label: "Group Portfolio" },
+  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 export function AppNavbar() {
+  const pathname = usePathname();
+
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div className="container">
-        <Link className="navbar-brand fw-semibold" href="/">
-          Alpha Pool
+    <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
+        <Link href="/" className="text-sm font-semibold tracking-wide">
+          Alpha<span className="text-primary">Pool</span>
         </Link>
-        <div className="navbar-nav ms-auto">
-          {links.map((link) => (
-            <Link key={link.href} className="nav-link" href={link.href}>
-              {link.label}
-            </Link>
-          ))}
+        <div className="flex items-center gap-1">
+          {links.map((link) => {
+            const active = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>

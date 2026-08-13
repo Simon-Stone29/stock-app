@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
+import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
+import { cn } from "@/src/lib/utils";
 
 export default function GroupPortfolio() {
   const [portfolio, setPortfolio] = useState<any[]>([]);
@@ -24,7 +26,6 @@ export default function GroupPortfolio() {
         .eq("week_start", weekStart)
         .order("percentage", { ascending: false });
 
-      // Get stock names
       const { data: stockData } = await supabase
         .from("stocks")
         .select("Symbol, Name");
@@ -77,41 +78,55 @@ export default function GroupPortfolio() {
     calculateGroupPerformance();
   }, [weekStart, portfolio]);
 
+  const positive = (groupPerformance ?? 0) >= 0;
+
   return (
-    <div className="container mt-4">
-      <h1 className="mb-4">Group Portfolio</h1>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <h1 className="mb-6 text-xl font-semibold tracking-tight">Group Portfolio</h1>
+
       {weekStart && (
-        <div className="mb-2">
-          <p className="text-muted mb-1">Week of {weekStart}</p>
-          <p className="text-muted small">
-            Current Group Change: <strong>{groupPerformance !== null ? (groupPerformance >= 0 ? "+" : "") + groupPerformance.toFixed(2) + "%" : "—"}</strong>
-            <br />
-            <small>(Since Monday {weekStart})</small>
-          </p>
+        <div className="mb-8">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Current week change
+          </div>
+          <div
+            className={cn(
+              "mt-1 text-3xl font-semibold tabular-nums",
+              groupPerformance === null
+                ? "text-muted-foreground"
+                : positive
+                ? "text-success"
+                : "text-destructive"
+            )}
+          >
+            {groupPerformance !== null
+              ? `${positive ? "+" : ""}${groupPerformance.toFixed(2)}%`
+              : "—"}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Since Monday {weekStart}
+          </div>
         </div>
       )}
-      <div className="card">
-        <div className="card-body">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Stock</th>
-                <th>Allocation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {portfolio.map((p) => (
-                <tr key={p.symbol}>
-                  <td>
-                    <strong>{p.symbol}</strong> — {stocks[p.symbol]}
-                  </td>
-                  <td>{p.percentage.toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Allocations</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-border p-0">
+          {portfolio.map((p) => (
+            <div key={p.symbol} className="flex items-center justify-between px-5 py-3">
+              <span className="text-sm">
+                <span className="font-medium">{p.symbol}</span>
+                <span className="text-muted-foreground"> — {stocks[p.symbol]}</span>
+              </span>
+              <span className="tabular-nums text-sm text-muted-foreground">
+                {p.percentage.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }

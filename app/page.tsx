@@ -1,15 +1,35 @@
 "use client";
 import { useEffect, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { supabase } from "@/src/lib/supabase";
 import { getLastMonday, getNextMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
 import UsernameSetupModal from "@/src/components/UsernameSetupModal";
+import { Button } from "@/src/components/ui/button";
+import { Badge } from "@/src/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
+import { cn } from "@/src/lib/utils";
+
 const MAX_STOCKS = 10;
 const MAX_SINGLE_ALLOCATION = 100;
 
-// Formats a Date as YYYY-MM-DD using LOCAL calendar components.
-// Never use toISOString() for calendar dates — it converts to UTC first,
-// which can shift the date near midnight depending on the user's timezone.
-
+function GainLabel({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-muted-foreground">—</span>;
+  const positive = value >= 0;
+  return (
+    <span className={cn("tabular-nums", positive ? "text-success" : "text-destructive")}>
+      {positive ? "+" : ""}
+      {value.toFixed(2)}%
+    </span>
+  );
+}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -21,6 +41,7 @@ export default function Home() {
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
   const [currentWeekGain, setCurrentWeekGain] = useState<number | null>(null);
+  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_change_pct: number }[]>([]);
   const [serverTime, setServerTime] = useState<any>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
 
@@ -37,7 +58,6 @@ export default function Home() {
       setUser(nextUser);
 
       if (nextUser) {
-        // Check if user exists in database
         const { data: existingUser } = await supabase
           .from("users")
           .select("username")
@@ -45,7 +65,6 @@ export default function Home() {
           .single();
 
         if (!existingUser) {
-          // New user - generate random username and show modal
           const randomUsername = await generateUniqueUsername();
           await supabase.from("users").insert({
             id: nextUser.id,
@@ -54,7 +73,6 @@ export default function Home() {
           });
           setShowUsernameModal(true);
         } else if (!existingUser.username) {
-          // Existing user without username (migration case)
           const randomUsername = await generateUniqueUsername();
           await supabase
             .from("users")
@@ -91,7 +109,6 @@ export default function Home() {
       .then(({ data }) => setStocks(data || []));
   }, [user]);
 
-  // Fetch server time context
   useEffect(() => {
     const fetchServerTime = () => {
       fetch("/api/time-context")
@@ -100,24 +117,19 @@ export default function Home() {
     };
 
     fetchServerTime();
-    const interval = setInterval(fetchServerTime, 60000); // Refresh every minute
+    const interval = setInterval(fetchServerTime, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate week_start from test date or server time
   useEffect(() => {
     if (serverTime?.isSimulation) {
-      // In simulation mode, server controls time
       setWeekStart(serverTime.weekStart);
       setIsVotingPhase(serverTime.votingOpen);
     } else {
-      // In production, use the live current time
       const testDate = currentDateTime;
-    const votingOpen = isVotingOpen(testDate);
-    setIsVotingPhase(votingOpen);
-    // During voting: show next week's picks (what you're submitting for)
-    // After voting: show current week's picks (what's active now)
-    setWeekStart(votingOpen ? getNextMonday(testDate) : getLastMonday(testDate));
+      const votingOpen = isVotingOpen(testDate);
+      setIsVotingPhase(votingOpen);
+      setWeekStart(votingOpen ? getNextMonday(testDate) : getLastMonday(testDate));
     }
   }, [currentDateTime, serverTime]);
 
@@ -133,7 +145,30 @@ export default function Home() {
       });
   }, [user, weekStart]);
 
-  // Calculate last week's gain
+  useEffect(() => {
+    if (!user) {
+      setPortfolioHistory([]);
+      return;
+    }
+
+    const fetchPortfolioHistory = async () => {
+      const { data } = await supabase
+        .from("user_portfolio_daily")
+        .select("snapshot_date, portfolio_change_pct")
+        .eq("user_id", user.id)
+        .order("snapshot_date", { ascending: true });
+
+      setPortfolioHistory(
+        (data ?? []).map((row) => ({
+          snapshot_date: row.snapshot_date,
+          portfolio_change_pct: Number(row.portfolio_change_pct),
+        }))
+      );
+    };
+
+    void fetchPortfolioHistory();
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -213,7 +248,6 @@ export default function Home() {
 
     calculateCurrentWeekGain();
   }, [user, weekStart, picks]);
-
 
   const generateUniqueUsername = async (): Promise<string> => {
     while (true) {
@@ -314,8 +348,24 @@ export default function Home() {
     alert("Picks submitted!");
   };
 
+  if (!user) {
+    return (
+      <div className="mx-auto flex min-h-[80vh] max-w-4xl flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Alpha<span className="text-primary">Pool</span>
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Pick your stocks. Beat the group.
+        </p>
+        <Button className="mt-6" onClick={login}>
+          Continue with Google
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mt-4">
+    <div className="mx-auto max-w-4xl px-4 py-8">
       {showUsernameModal && (
         <UsernameSetupModal
           onSubmit={handleUsernameSubmit}
@@ -323,132 +373,195 @@ export default function Home() {
         />
       )}
 
-      {!user && (
-        <div className="text-center py-4">
-          <h1>AlphaPool</h1>
-          <button className="btn btn-primary mt-3" onClick={login}>
-            Login with Google
-          </button>
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">My Picks</h1>
+        <span className="text-sm text-muted-foreground">{user.email}</span>
+      </div>
+
+      {/* Status row */}
+      <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+        {serverTime?.isSimulation ? (
+          <Badge variant="default">Simulation — {serverTime.currentTime}</Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            {currentDateTime.toLocaleString()}
+          </span>
+        )}
+        <Badge variant={isVotingPhase ? "success" : "outline"}>
+          {isVotingPhase ? "Voting open" : "Voting locked"}
+        </Badge>
+      </div>
+
+      {/* Stat row */}
+      <div className="mb-8 grid grid-cols-2 gap-6">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Last week
+          </div>
+          <div className="mt-1 text-3xl font-semibold">
+            <GainLabel value={lastWeekGain} />
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Week of {getPreviousMonday(currentDateTime)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Current week
+          </div>
+          <div className="mt-1 text-3xl font-semibold">
+            <GainLabel value={currentWeekGain} />
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Since {getLastMonday(currentDateTime)}
+          </div>
+        </div>
+      </div>
+
+      {/* Add stock */}
+      <div className="mb-8">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Add a stock
+        </div>
+        <div className="flex gap-2">
+          <select
+            className="h-10 flex-1 rounded-lg border border-border bg-muted px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-40"
+            value={selectedSymbol}
+            onChange={(e) => setSelectedSymbol(e.target.value)}
+            disabled={!isVotingPhase}
+          >
+            <option value="">Select a stock...</option>
+            {stocks.map((s) => (
+              <option key={s.Symbol} value={s.Symbol}>
+                {s.Symbol} — {s.Name}
+              </option>
+            ))}
+          </select>
+          <Button onClick={addStock} disabled={!isVotingPhase}>
+            Add
+          </Button>
+        </div>
+        {!isVotingPhase && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Voting closed. Try again Saturday 9 AM.
+          </p>
+        )}
+      </div>
+
+      {/* Picks */}
+      {picks.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Your picks</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {picks.map((p) => (
+              <div key={p.symbol} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{p.symbol}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="tabular-nums text-sm text-muted-foreground">
+                      {p.percentage}%
+                    </span>
+                    <button
+                      className="text-muted-foreground transition-colors hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
+                      onClick={() => removeStock(p.symbol)}
+                      disabled={!isVotingPhase}
+                      aria-label={`Remove ${p.symbol}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  className="mt-3 w-full accent-primary"
+                  min={0}
+                  max={MAX_SINGLE_ALLOCATION}
+                  value={p.percentage}
+                  onChange={(e) => updatePercentage(p.symbol, Number(e.target.value))}
+                  disabled={!isVotingPhase}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submit */}
+      {picks.length > 0 && (
+        <div className="mb-8 flex items-center justify-between rounded-xl border border-border p-4">
+          <span
+            className={cn(
+              "tabular-nums text-sm font-medium",
+              totalAllocated === 100 ? "text-success" : "text-destructive"
+            )}
+          >
+            Total: {totalAllocated}%{" "}
+            {totalAllocated === 100 ? "✓" : `(${100 - totalAllocated}% remaining)`}
+          </span>
+          <Button
+            onClick={submitPicks}
+            disabled={!isVotingPhase || totalAllocated !== 100}
+          >
+            Submit picks
+          </Button>
         </div>
       )}
 
-      {user && (
-        <>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h1 className="mb-4">My Picks</h1>
-            <span className="text-muted small">{user.email}</span>
-          </div>
-
-          {!serverTime?.isSimulation && (
-            <div className="card mb-4 bg-light">
-              <div className="card-body d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="small text-muted">Current time</div>
-                  <div className="fw-semibold">{currentDateTime.toLocaleString()}</div>
-                </div>
-                <span className="badge bg-info">{isVotingPhase ? "🔓 VOTING" : "🔒 LOCKED"}</span>
-              </div>
+      {/* Performance chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Portfolio performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {portfolioHistory.length > 0 ? (
+            <div style={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer>
+                <LineChart data={portfolioHistory} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="snapshot_date"
+                    tickFormatter={(value: string) => value.slice(5)}
+                    minTickGap={24}
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                  />
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    domain={[
+                      (dataMin: number) => Math.min(dataMin, -5),
+                      (dataMax: number) => Math.max(dataMax, 5),
+                    ]}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(value) => [`${Number(value ?? 0).toFixed(2)}%`, "Change"]}
+                    labelFormatter={(label) => `Day ${String(label)}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="portfolio_change_pct"
+                    stroke="var(--primary)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: "var(--primary)" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No portfolio history yet for this user.</p>
           )}
-
-          {serverTime?.isSimulation && (
-            <div className="alert alert-warning">
-              <strong>Simulation Mode Active</strong> - Server time: {serverTime.currentTime}
-            </div>
-          )}
-
-          {/* Last Week Gain */}
-          <div className="alert alert-info mb-2">
-            Last Week's Change: <strong>{lastWeekGain !== null ? (lastWeekGain >= 0 ? "+" : "") + lastWeekGain.toFixed(2) + "%" : "—"}</strong>
-            <br />
-            <small className="text-muted">(Week of {getPreviousMonday(currentDateTime)})</small>
-          </div>
-          <div className="alert alert-secondary">
-            Current Week Change: <strong>{currentWeekGain !== null ? (currentWeekGain >= 0 ? "+" : "") + currentWeekGain.toFixed(2) + "%" : "—"}</strong>
-            <br />
-            <small className="text-muted">(Since {getLastMonday(currentDateTime)})</small>
-          </div>
-
-          {/* Add Stock */}
-          <div className="card mb-4">
-            <div className="card-body">
-              <h5 className="card-title">Add a Stock</h5>
-              <div className="d-flex gap-2">
-                <select
-                  className="form-select"
-                  value={selectedSymbol}
-                  onChange={(e) => setSelectedSymbol(e.target.value)}
-                  disabled={!isVotingPhase}
-                >
-                  <option value="">Select a stock...</option>
-                  {stocks.map((s) => (
-                    <option key={s.Symbol} value={s.Symbol}>
-                      {s.Symbol} — {s.Name}
-                    </option>
-                  ))}
-                </select>
-                <button className="btn btn-primary" onClick={addStock} disabled={!isVotingPhase}>
-                  Add
-                </button>
-              </div>
-              {!isVotingPhase && <small className="text-muted d-block mt-2">Voting closed. Try again Saturday 9 AM.</small>}
-            </div>
-          </div>
-
-          {/* Picks */}
-          {picks.length > 0 && (
-            <div className="card mb-4">
-              <div className="card-body">
-                <h5 className="card-title">Your Picks</h5>
-                {picks.map((p) => (
-                  <div key={p.symbol} className="mb-3">
-                    <div className="d-flex justify-content-between">
-                      <span className="fw-bold">{p.symbol}</span>
-                      <div className="d-flex align-items-center gap-2">
-                        <span>{p.percentage}%</span>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => removeStock(p.symbol)}
-                          disabled={!isVotingPhase}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      className="form-range"
-                      min={0}
-                      max={MAX_SINGLE_ALLOCATION}
-                      value={p.percentage}
-                      onChange={(e) => updatePercentage(p.symbol, Number(e.target.value))}
-                      disabled={!isVotingPhase}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Total + Submit */}
-          {picks.length > 0 && (
-            <div className="card">
-              <div className="card-body d-flex justify-content-between align-items-center">
-                <span className={totalAllocated === 100 ? "text-success fw-bold" : "text-danger fw-bold"}>
-                  Total: {totalAllocated}% {totalAllocated === 100 ? "✓" : `(${100 - totalAllocated}% remaining)`}
-                </span>
-                <button
-                  className="btn btn-success"
-                  onClick={submitPicks}
-                  disabled={!isVotingPhase || totalAllocated !== 100}
-                >
-                  Submit Picks
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
