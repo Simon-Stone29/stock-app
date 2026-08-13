@@ -62,14 +62,14 @@ export default function Leaderboard() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 text-sm text-muted-foreground">
+      <div className="mx-auto max-w-3xl px-4 py-8 text-sm text-muted-foreground">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Leaderboard</h1>
         {lastUpdateDate && (

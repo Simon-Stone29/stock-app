@@ -77,7 +77,7 @@ export default function About() {
   return (
     <div>
       {/* Hero */}
-      <section className="mx-auto flex min-h-[90vh] max-w-4xl flex-col justify-center px-4">
+      <section className="mx-auto flex min-h-[90vh] max-w-3xl flex-col justify-center px-4">
         <span className="text-sm font-semibold uppercase tracking-widest text-primary">
           AlphaPool
         </span>

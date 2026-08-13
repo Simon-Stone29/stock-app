@@ -15,7 +15,7 @@ export function AppNavbar() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
+      <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4">
         <Link href="/" className="text-2xl font-semibold tracking-wide">
           Alpha<span className="text-primary">Pool</span>
         </Link>

@@ -350,7 +350,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div className="mx-auto flex min-h-[80vh] max-w-4xl flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto flex min-h-[80vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">
           Alpha<span className="text-primary">Pool</span>
         </h1>
@@ -365,7 +365,7 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8">
       {showUsernameModal && (
         <UsernameSetupModal
           onSubmit={handleUsernameSubmit}
