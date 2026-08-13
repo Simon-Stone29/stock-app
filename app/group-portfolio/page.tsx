@@ -43,27 +43,15 @@ export default function GroupPortfolio() {
 
   useEffect(() => {
     const fetchGroupBalance = async () => {
-      // Get all users
-      const { data: users } = await supabase
-        .from("users")
-        .select("id");
-
-      if (!users?.length) {
-        setGroupBalance(0);
-        setUserCount(0);
-        return;
-      }
-
-      setUserCount(users.length);
-
-      // Get latest score for all users
+      // Get latest score for all users who have scores
       const { data: scores } = await supabase
         .from("scores")
         .select("user_id, competence_score, week_start")
         .order("week_start", { ascending: false });
 
       if (!scores?.length) {
-        setGroupBalance(1000 * users.length); // Default if no scores yet
+        setGroupBalance(0);
+        setUserCount(0);
         return;
       }
 
@@ -75,16 +63,12 @@ export default function GroupPortfolio() {
         }
       });
 
-      // For users with no score yet, default to 1000
-      users.forEach(u => {
-        if (!userLatestScores[u.id]) {
-          userLatestScores[u.id] = 1000;
-        }
-      });
-
       // Sum all user balances
       const totalBalance = Object.values(userLatestScores).reduce((sum, score) => sum + score, 0);
+      const numUsers = Object.keys(userLatestScores).length;
+
       setGroupBalance(totalBalance);
+      setUserCount(numUsers);
     };
 
     fetchGroupBalance();

@@ -115,7 +115,7 @@ export default function Leaderboard() {
                     "tabular-nums text-xs",
                     totalGained >= 0 ? "text-success" : "text-destructive"
                   )}>
-                    {totalGained >= 0 ? "+" : ""}${totalGained.toFixed(0)}
+                    {totalGained >= 0 ? "+" : ""}{((totalGained / 1000) * 100).toFixed(1)}%
                   </div>
                 </div>
               </div>
