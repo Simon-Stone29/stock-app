@@ -7,6 +7,7 @@ const links = [
   { href: "/", label: "My Picks" },
   { href: "/group-portfolio", label: "Group Portfolio" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/about", label: "About" },
 ];
 
 export function AppNavbar() {
@@ -14,8 +15,8 @@ export function AppNavbar() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-semibold tracking-wide">
+      <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
+        <Link href="/" className="text-2xl font-semibold tracking-wide">
           Alpha<span className="text-primary">Pool</span>
         </Link>
         <div className="flex items-center gap-1">
@@ -26,7 +27,7 @@ export function AppNavbar() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-md transition-colors",
+                  "rounded-md px-3 py-2 text-base transition-colors",
                   active
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground"
