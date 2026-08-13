@@ -122,11 +122,11 @@ export default function GroupPortfolio() {
       {/* Group Balance */}
       <div className="mb-6">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Group Total
+          Group Average
         </div>
         <div className="mt-1 flex items-baseline gap-3">
           <div className="text-4xl font-semibold tabular-nums">
-            ${groupBalance.toFixed(0)}
+            ${userCount > 0 ? (groupBalance / userCount).toFixed(0) : '0'}
           </div>
           {userCount > 0 && (
             <div className={cn(
@@ -136,9 +136,6 @@ export default function GroupPortfolio() {
               {((groupBalance / userCount) - 1000) >= 0 ? "+" : ""}{((((groupBalance / userCount) - 1000) / 1000) * 100).toFixed(1)}%
             </div>
           )}
-        </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {userCount} player{userCount !== 1 ? 's' : ''} • Avg ${userCount > 0 ? (groupBalance / userCount).toFixed(0) : '0'} per player
         </div>
       </div>
 
