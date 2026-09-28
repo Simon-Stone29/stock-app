@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/src/lib/utils";
@@ -12,14 +13,17 @@ const links = [
 
 export function AppNavbar() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
-        <Link href="/" className="text-2xl font-semibold tracking-wide">
+      <div className="mx-auto flex h-16 w-full max-w-full items-center justify-between px-4">
+        <Link href="/" className="text-xl font-semibold tracking-wide">
           Alpha<span className="text-primary">Pool</span>
         </Link>
-        <div className="flex items-center gap-1">
+        
+        {/* Desktop Nav */}
+        <div className="hidden md:flex items-center gap-1">
           {links.map((link) => {
             const active = pathname === link.href;
             return (
@@ -27,7 +31,7 @@ export function AppNavbar() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-base transition-colors",
+                  "rounded-md px-2 py-1 text-sm transition-colors",
                   active
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -38,7 +42,43 @@ export function AppNavbar() {
             );
           })}
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          className="md:hidden p-2 rounded-md hover:bg-muted"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span className="block w-5 h-0.5 bg-foreground mb-1.5"></span>
+          <span className="block w-5 h-0.5 bg-foreground mb-1.5"></span>
+          <span className="block w-5 h-0.5 bg-foreground"></span>
+        </button>
       </div>
+
+      {/* Mobile Nav Menu */}
+      {isOpen && (
+        <div className="md:hidden border-t border-border bg-background">
+          <div className="flex flex-col gap-0 px-4 py-2">
+            {links.map((link) => {
+              const active = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "px-2 py-2 rounded-md transition-colors",
+                    active
+                      ? "bg-muted text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
