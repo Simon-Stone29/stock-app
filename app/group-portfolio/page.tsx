@@ -18,9 +18,8 @@ export default function GroupPortfolio() {
   const [stocks, setStocks] = useState<any>({});
   const [weekStart, setWeekStart] = useState<string>("");
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
-  const [groupBalance, setGroupBalance] = useState<number>(0);
-  const [userCount, setUserCount] = useState<number>(0);
-  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_change_pct: number }[]>([]);
+  const [groupPortfolioValue, setGroupPortfolioValue] = useState<number>(1000);
+  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/time-context")
@@ -52,54 +51,22 @@ export default function GroupPortfolio() {
   }, [weekStart]);
 
   useEffect(() => {
-    const fetchGroupBalance = async () => {
-      // Get latest score for all users who have scores
-      const { data: scores } = await supabase
-        .from("scores")
-        .select("user_id, competence_score, week_start")
-        .order("week_start", { ascending: false });
-
-      if (!scores?.length) {
-        setGroupBalance(0);
-        setUserCount(0);
-        return;
-      }
-
-      // Get latest score per user
-      const userLatestScores: Record<string, number> = {};
-      scores.forEach(s => {
-        if (!userLatestScores[s.user_id]) {
-          userLatestScores[s.user_id] = s.competence_score;
-        }
-      });
-
-      // Sum all user balances
-      const totalBalance = Object.values(userLatestScores).reduce((sum, score) => sum + score, 0);
-      const numUsers = Object.keys(userLatestScores).length;
-
-      setGroupBalance(totalBalance);
-      setUserCount(numUsers);
-    };
-
-    fetchGroupBalance();
-  }, []);
-
-  useEffect(() => {
     const fetchPortfolioHistory = async () => {
       const { data } = await supabase
         .from("group_portfolio_daily")
-        .select("snapshot_date, portfolio_change_pct")
+        .select("snapshot_date, portfolio_value")
         .order("snapshot_date", { ascending: true });
 
-      setPortfolioHistory(
-        (data ?? []).map((row) => ({
-          snapshot_date: row.snapshot_date,
-          portfolio_change_pct: Number(row.portfolio_change_pct),
-        }))
-      );
+      const history = (data ?? []).map((row) => ({
+        snapshot_date: row.snapshot_date,
+        portfolio_value: Number(row.portfolio_value),
+      }));
+
+      setPortfolioHistory(history);
+      if (history.length) setGroupPortfolioValue(history[history.length - 1].portfolio_value);
     };
 
-    fetchPortfolioHistory();
+    void fetchPortfolioHistory();
   }, []);
 
   useEffect(() => {
@@ -150,20 +117,18 @@ export default function GroupPortfolio() {
       {/* Group Balance */}
       <div className="mb-6">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Group Average
+          Group Portfolio Value
         </div>
         <div className="mt-1 flex items-baseline gap-3">
           <div className="text-4xl font-semibold tabular-nums">
-            ${userCount > 0 ? (groupBalance / userCount).toFixed(0) : '0'}
+            ${groupPortfolioValue.toFixed(0)}
           </div>
-          {userCount > 0 && (
-            <div className={cn(
-              "text-lg tabular-nums",
-              ((groupBalance / userCount) - 1000) >= 0 ? "text-success" : "text-destructive"
-            )}>
-              {((groupBalance / userCount) - 1000) >= 0 ? "+" : ""}{((((groupBalance / userCount) - 1000) / 1000) * 100).toFixed(1)}%
-            </div>
-          )}
+          <div className={cn(
+            "text-lg tabular-nums",
+            groupPortfolioValue >= 1000 ? "text-success" : "text-destructive"
+          )}>
+            {groupPortfolioValue >= 1000 ? "+" : ""}{(((groupPortfolioValue - 1000) / 1000) * 100).toFixed(1)}%
+          </div>
         </div>
       </div>
 
@@ -232,10 +197,8 @@ export default function GroupPortfolio() {
                   <YAxis
                     stroke="var(--muted-foreground)"
                     fontSize={12}
-                    domain={[
-                      (dataMin: number) => Math.min(dataMin, -5),
-                      (dataMax: number) => Math.max(dataMax, 5),
-                    ]}
+                    domain={["dataMin - 10", "dataMax + 10"]}
+                    tickFormatter={(value: number) => `$${value.toFixed(0)}`}
                   />
                   <Tooltip
                     contentStyle={{
@@ -244,12 +207,12 @@ export default function GroupPortfolio() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(value) => [`${Number(value ?? 0).toFixed(2)}%`, "Change"]}
-                    labelFormatter={(label) => `Day ${String(label)}`}
+                    formatter={(value) => [`$${Number(value ?? 0).toFixed(2)}`, "Portfolio value"]}
+                    labelFormatter={(label) => String(label)}
                   />
                   <Line
                     type="monotone"
-                    dataKey="portfolio_change_pct"
+                    dataKey="portfolio_value"
                     stroke="var(--primary)"
                     strokeWidth={2.5}
                     dot={{ r: 3, fill: "var(--primary)" }}
