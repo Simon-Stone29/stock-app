@@ -41,7 +41,7 @@ export default function Home() {
   const [weekStart, setWeekStart] = useState("");
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
   const [currentWeekGain, setCurrentWeekGain] = useState<number | null>(null);
-  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_change_pct: number }[]>([]);
+  const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
   const [serverTime, setServerTime] = useState<any>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [portfolioBalance, setPortfolioBalance] = useState<number>(1000);
@@ -155,15 +155,15 @@ export default function Home() {
 
     const fetchPortfolioHistory = async () => {
       const { data } = await supabase
-        .from("user_portfolio_daily")
-        .select("snapshot_date, portfolio_change_pct")
+        .from("scores")
+        .select("score_date, competence_score")
         .eq("user_id", user.id)
-        .order("snapshot_date", { ascending: true });
+        .order("score_date", { ascending: true });
 
       setPortfolioHistory(
         (data ?? []).map((row) => ({
-          snapshot_date: row.snapshot_date,
-          portfolio_change_pct: Number(row.portfolio_change_pct),
+          snapshot_date: row.score_date,
+          portfolio_value: Number(row.competence_score),
         }))
       );
     };
@@ -173,7 +173,7 @@ export default function Home() {
         .from("scores")
         .select("competence_score")
         .eq("user_id", user.id)
-        .order("week_start", { ascending: false })
+        .order("score_date", { ascending: false })
         .limit(1)
         .single();
 
@@ -564,10 +564,8 @@ export default function Home() {
                   <YAxis
                     stroke="var(--muted-foreground)"
                     fontSize={12}
-                    domain={[
-                      (dataMin: number) => Math.min(dataMin, -5),
-                      (dataMax: number) => Math.max(dataMax, 5),
-                    ]}
+                    domain={["dataMin - 10", "dataMax + 10"]}
+                    tickFormatter={(value: number) => `$${value.toFixed(0)}`}
                   />
                   <Tooltip
                     contentStyle={{
@@ -576,12 +574,12 @@ export default function Home() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(value) => [`${Number(value ?? 0).toFixed(2)}%`, "Change"]}
-                    labelFormatter={(label) => `Day ${String(label)}`}
+                    formatter={(value) => [`$${Number(value ?? 0).toFixed(2)}`, "Portfolio value"]}
+                    labelFormatter={(label) => String(label)}
                   />
                   <Line
                     type="monotone"
-                    dataKey="portfolio_change_pct"
+                    dataKey="portfolio_value"
                     stroke="var(--primary)"
                     strokeWidth={2.5}
                     dot={{ r: 3, fill: "var(--primary)" }}
