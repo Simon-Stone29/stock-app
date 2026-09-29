@@ -227,15 +227,23 @@ async function main() {
   }
 
   // Get each user's latest score
-  const { data: latestScores } = await supabase
+// Fetch each user's latest historical score prior to today
+// Get each user's most recent score from a PREVIOUS week.
+// This becomes their starting score for the current week.
+  const { data: priorScores } = await supabase
     .from("scores")
-    .select("user_id, competence_score")
+    .select("user_id, competence_score, week_start")
     .in("user_id", Object.keys(byUser))
-    .order("week_start", { ascending: false });
+    .lt("week_start", WEEK_START)
+    .order("score_date", { ascending: false });
 
-  const scoreMap: Record<string, number> = {};
-  latestScores?.forEach(s => {
-    if (!scoreMap[s.user_id]) scoreMap[s.user_id] = s.competence_score;
+  const weekStartScoreMap: Record<string, number> = {};
+
+  priorScores?.forEach(s => {
+    // First match per user is their most recent score from a previous week
+    if (!(s.user_id in weekStartScoreMap)) {
+      weekStartScoreMap[s.user_id] = s.competence_score;
+    }
   });
 
   // Calculate each user's current return and update score
@@ -250,42 +258,32 @@ async function main() {
       weeklyReturn += stockReturn * (pick.percentage / 100);
     }
 
-    const startingScore = scoreMap[user_id] ?? 1000;
-    const delta = weeklyReturn * 100; // SENSITIVITY = 100
-    const newScore = startingScore + delta;
+    const weekStartScore = weekStartScoreMap[user_id] ?? 1000;
+
+    // Calculate today's score from the fixed starting score for this week.
+    // weeklyReturn is already the total return since Monday.
+    const newScore = (1 + weeklyReturn) * weekStartScore;
 
     console.log(`  User ${user_id.substring(0, 8)}:`);
     console.log(`    Weekly return: ${(weeklyReturn * 100).toFixed(2)}%`);
-    console.log(`    Starting score: ${startingScore.toFixed(0)}`);
-    console.log(`    Score delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(0)}`);
+    console.log(`    Week-start score: ${weekStartScore.toFixed(0)}`);
     console.log(`    New score: ${newScore.toFixed(0)}`);
-
     // Upsert weekly score for leaderboard/ranking.
     const { error: scoreError } = await supabase
       .from("scores")
       .upsert({
         user_id,
-        week_start: WEEK_START,
+        score_date: TODAY,      // <--- Primary key component
+        week_start: WEEK_START, // <--- Preserved week reference
         competence_score: newScore,
-      }, { onConflict: "user_id,week_start" });
+      }, { onConflict: "user_id,score_date" });
 
     if (scoreError) {
-      console.error(`🧪 Daily update debug: failed to upsert weekly score for user ${user_id.substring(0, 8)}`, { scoreError });
+      console.error(`Error saving daily score for user ${user_id}:`, scoreError);
     }
 
     // Store daily percent-change snapshot for graphing.
-    const { error: dailyPortfolioError } = await supabase
-      .from("user_portfolio_daily")
-      .upsert({
-        user_id,
-        snapshot_date: TODAY,
-        week_start: WEEK_START,
-        portfolio_change_pct: weeklyReturn * 100,
-      }, { onConflict: "user_id,snapshot_date" });
 
-    if (dailyPortfolioError) {
-      console.error(`🧪 Daily update debug: failed to upsert daily portfolio snapshot for user ${user_id.substring(0, 8)}`, { dailyPortfolioError });
-    }
   }
 
   // Aggregate today's group portfolio snapshot using weighted `weekly_portfolio`.
@@ -318,13 +316,27 @@ async function main() {
       if (!hasData) {
         console.log("🧪 Daily update: weekly_portfolio exists but no price data available for its symbols — skipping group snapshot.");
       } else {
-        const groupChangePct = weightedReturn * 100;
+  // 1. Fetch group portfolio value from BEFORE this week started (same as priorScores logic)
+        const { data: priorGroup } = await supabase
+          .from("group_portfolio_daily")
+          .select("portfolio_value")
+          .lt("week_start", WEEK_START)
+          .order("snapshot_date", { ascending: false })
+          .limit(1);
+
+        const groupStartValue = Number(priorGroup?.[0]?.portfolio_value) || 1000;
+
+        // 2. Compound starting value with week-to-date return
+        const newGroupValue = (1 + weightedReturn) * groupStartValue;
+
+        // 3. Upsert snapshot
         const { error: groupDailyError } = await supabase
           .from("group_portfolio_daily")
           .upsert({
             snapshot_date: TODAY,
             week_start: WEEK_START,
-            portfolio_change_pct: groupChangePct,
+            portfolio_value: newGroupValue,
+            portfolio_change_pct: weightedReturn * 100,
           }, { onConflict: "snapshot_date" });
 
         if (groupDailyError) {
