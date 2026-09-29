@@ -28,8 +28,8 @@ export default function Leaderboard() {
 
         const { data: scores, error: scoresError } = await supabase
           .from("scores")
-          .select("user_id, competence_score, week_start")
-          .order("week_start", { ascending: false });
+          .select("user_id, competence_score, score_date")
+          .order("score_date", { ascending: false });
 
         console.log("Scores:", scores, scoresError);
 
@@ -40,14 +40,7 @@ export default function Leaderboard() {
           }
         });
 
-        const latestWeekStart = scores?.length
-          ? scores.reduce((latest, score) =>
-              score.week_start > latest ? score.week_start : latest,
-              scores[0].week_start
-            )
-          : null;
-
-        setLastUpdateDate(latestWeekStart);
+        setLastUpdateDate(scores?.[0]?.score_date ?? null);
 
         const combined = users
           ?.map((user) => ({
