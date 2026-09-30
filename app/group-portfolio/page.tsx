@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -20,6 +21,7 @@ export default function GroupPortfolio() {
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
   const [groupPortfolioValue, setGroupPortfolioValue] = useState<number>(1000);
   const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
+  const [benchmarkHistory, setBenchmarkHistory] = useState<{ snapshot_date: string; week_start: string; benchmark_value: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/time-context")
@@ -67,6 +69,23 @@ export default function GroupPortfolio() {
     };
 
     void fetchPortfolioHistory();
+
+    const fetchBenchmarkHistory = async () => {
+      const { data } = await supabase
+        .from("benchmark_daily")
+        .select("snapshot_date, week_start, benchmark_value")
+        .order("snapshot_date", { ascending: true });
+
+      setBenchmarkHistory(
+        (data ?? []).map((row) => ({
+          snapshot_date: row.snapshot_date,
+          week_start: row.week_start,
+          benchmark_value: Number(row.benchmark_value),
+        }))
+      );
+    };
+
+    void fetchBenchmarkHistory();
   }, []);
 
   useEffect(() => {
@@ -109,32 +128,52 @@ export default function GroupPortfolio() {
   }, [weekStart, portfolio]);
 
   const positive = (groupPerformance ?? 0) >= 0;
+  const benchmarkPortfolioValue = benchmarkHistory.at(-1)?.benchmark_value ?? 1000;
+  const benchmarkTotalReturn = ((benchmarkPortfolioValue - 1000) / 1000) * 100;
+  const currentWeekBenchmarkHistory = benchmarkHistory.filter((row) => row.week_start === weekStart);
+  const previousBenchmarkValue = benchmarkHistory
+    .filter((row) => row.week_start < weekStart)
+    .at(-1)?.benchmark_value ?? 1000;
+  const latestCurrentWeekBenchmark = currentWeekBenchmarkHistory.at(-1)?.benchmark_value;
+  const benchmarkWeekPerformance = latestCurrentWeekBenchmark === undefined
+    ? null
+    : ((latestCurrentWeekBenchmark / previousBenchmarkValue) - 1) * 100;
+  const benchmarkPositive = (benchmarkWeekPerformance ?? 0) >= 0;
+  const portfolioValuesByDate = new Map<string, number>();
+  portfolioHistory.forEach((row) => portfolioValuesByDate.set(row.snapshot_date, row.portfolio_value));
+  const benchmarkValuesByDate = new Map<string, number>();
+  benchmarkHistory.forEach((row) => benchmarkValuesByDate.set(row.snapshot_date, row.benchmark_value));
+  const chartDates = Array.from(new Set([
+    ...portfolioHistory.map((row) => row.snapshot_date),
+    ...benchmarkHistory.map((row) => row.snapshot_date),
+  ])).sort();
+  const comparisonHistory = chartDates.map((snapshot_date) => ({
+    snapshot_date,
+    portfolio_value: portfolioValuesByDate.get(snapshot_date),
+    benchmark_value: benchmarkValuesByDate.get(snapshot_date),
+  }));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold tracking-tight">Group Portfolio</h1>
 
-      {/* Group Balance */}
-      <div className="mb-6">
-        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Group Portfolio Value
-        </div>
-        <div className="mt-1 flex items-baseline gap-3">
-          <div className="text-4xl font-semibold tabular-nums">
-            ${groupPortfolioValue.toFixed(0)}
-          </div>
-          <div className={cn(
-            "text-lg tabular-nums",
-            groupPortfolioValue >= 1000 ? "text-success" : "text-destructive"
-          )}>
-            {groupPortfolioValue >= 1000 ? "+" : ""}{(((groupPortfolioValue - 1000) / 1000) * 100).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-
-      {weekStart && (
-        <div className="mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div className="md:border-r md:border-border md:pr-8">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Group Portfolio Value
+          </div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <div className="text-4xl font-semibold tabular-nums">
+              ${groupPortfolioValue.toFixed(0)}
+            </div>
+            <div className={cn(
+              "text-lg tabular-nums",
+              groupPortfolioValue >= 1000 ? "text-success" : "text-destructive"
+            )}>
+              {groupPortfolioValue >= 1000 ? "+" : ""}{(((groupPortfolioValue - 1000) / 1000) * 100).toFixed(1)}%
+            </div>
+          </div>
+          <div className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Current week change
           </div>
           <div
@@ -155,7 +194,44 @@ export default function GroupPortfolio() {
             Since Monday {weekStart}
           </div>
         </div>
-      )}
+
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            S&amp;P 500 Value
+          </div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <div className="text-4xl font-semibold tabular-nums">
+              ${benchmarkPortfolioValue.toFixed(0)}
+            </div>
+            <div className={cn(
+              "text-lg tabular-nums",
+              benchmarkPortfolioValue >= 1000 ? "text-success" : "text-destructive"
+            )}>
+              {benchmarkTotalReturn >= 0 ? "+" : ""}{benchmarkTotalReturn.toFixed(1)}%
+            </div>
+          </div>
+          <div className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Current week change
+          </div>
+          <div
+            className={cn(
+              "mt-1 text-3xl font-semibold tabular-nums",
+              benchmarkWeekPerformance === null
+                ? "text-muted-foreground"
+                : benchmarkPositive
+                ? "text-success"
+                : "text-destructive"
+            )}
+          >
+            {benchmarkWeekPerformance !== null
+              ? `${benchmarkPositive ? "+" : ""}${benchmarkWeekPerformance.toFixed(2)}%`
+              : "—"}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Since Monday {weekStart}
+          </div>
+        </div>
+      </div>
 
       <Card className="mb-8">
         <CardHeader>
@@ -176,16 +252,15 @@ export default function GroupPortfolio() {
         </CardContent>
       </Card>
 
-      {/* Performance chart */}
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Portfolio performance</CardTitle>
+          <CardTitle>Group portfolio vs S&amp;P 500</CardTitle>
         </CardHeader>
         <CardContent>
-          {portfolioHistory.length > 0 ? (
-            <div style={{ width: "100%", height: 260 }}>
+          {comparisonHistory.length > 0 ? (
+            <div style={{ width: "100%", height: 320 }}>
               <ResponsiveContainer>
-                <LineChart data={portfolioHistory} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
+                <LineChart data={comparisonHistory} margin={{ top: 10, right: 16, left: 12, bottom: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="snapshot_date"
@@ -207,25 +282,38 @@ export default function GroupPortfolio() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(value) => [`$${Number(value ?? 0).toFixed(2)}`, "Portfolio value"]}
+                    formatter={(value, name) => [`$${Number(value ?? 0).toFixed(2)}`, String(name)]}
                     labelFormatter={(label) => String(label)}
                   />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Line
                     type="monotone"
                     dataKey="portfolio_value"
+                    name="Group portfolio"
                     stroke="var(--primary)"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: "var(--primary)" }}
+                    dot={false}
                     activeDot={{ r: 5 }}
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="benchmark_value"
+                    name="S&amp;P 500 (SPY)"
+                    stroke="var(--success)"
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    connectNulls
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No portfolio history yet for the group.</p>
+            <p className="text-sm text-muted-foreground">No portfolio or S&amp;P 500 history yet.</p>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
     </div>
   );
 }
