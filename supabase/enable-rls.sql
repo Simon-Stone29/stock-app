@@ -1,70 +1,82 @@
--- Row Level Security Setup for Stock App
--- Run this in Supabase SQL Editor when ready to enable security
--- IMPORTANT: Update admin scripts to use service role key BEFORE running this (see instructions below)
+-- Row Level Security Setup for Portfolio Daily Tracking
+-- This creates a daily percent-change model for both user and group performance.
 
 -- ========================================
--- STEP 1: Create Policies (BEFORE enabling RLS)
+-- STEP 1: Drop existing daily tracking tables/policies if they exist
 -- ========================================
 
--- Users table: anyone can read, users can insert/update their own record
-CREATE POLICY "Anyone can read users" ON users
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can read own daily portfolio" ON public.user_portfolio_daily;
+DROP POLICY IF EXISTS "Users can insert own daily portfolio" ON public.user_portfolio_daily;
+DROP POLICY IF EXISTS "Users can update own daily portfolio" ON public.user_portfolio_daily;
+DROP POLICY IF EXISTS "Users can delete own daily portfolio" ON public.user_portfolio_daily;
 
-CREATE POLICY "Users can insert own record" ON users
-  FOR INSERT WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "Anyone can read group portfolio daily" ON public.group_portfolio_daily;
 
-CREATE POLICY "Users can update own record" ON users
-  FOR UPDATE USING (auth.uid() = id);
+DROP TABLE IF EXISTS public.user_portfolio_daily;
+DROP TABLE IF EXISTS public.group_portfolio_daily;
 
--- Weekly picks: anyone can read, users can manage their own picks
-CREATE POLICY "Anyone can read picks" ON weekly_picks
-  FOR SELECT USING (true);
+-- ========================================
+-- STEP 2: Create daily percentage-tracking tables
+-- ========================================
 
-CREATE POLICY "Users can insert own picks" ON weekly_picks
+CREATE TABLE public.user_portfolio_daily (
+  user_id uuid NOT NULL,
+  snapshot_date date NOT NULL,
+  week_start date NOT NULL,
+  portfolio_change_pct numeric NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, snapshot_date)
+);
+
+CREATE TABLE public.group_portfolio_daily (
+  snapshot_date date PRIMARY KEY,
+  week_start date NOT NULL,
+  portfolio_change_pct numeric NOT NULL DEFAULT 0
+);
+
+-- ========================================
+-- STEP 3: RLS Policies
+-- ========================================
+
+-- Users can only see their own daily portfolio rows.
+CREATE POLICY "Users can read own daily portfolio" ON public.user_portfolio_daily
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own daily portfolio" ON public.user_portfolio_daily
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete own picks" ON weekly_picks
+CREATE POLICY "Users can update own daily portfolio" ON public.user_portfolio_daily
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own daily portfolio" ON public.user_portfolio_daily
   FOR DELETE USING (auth.uid() = user_id);
 
--- Scores: read-only for users (admin scripts write via service role key)
-CREATE POLICY "Anyone can read scores" ON scores
-  FOR SELECT USING (true);
-
--- Stock prices: read-only for users
-CREATE POLICY "Anyone can read stock_prices" ON stock_prices
-  FOR SELECT USING (true);
-
--- Stocks: read-only for all
-CREATE POLICY "Anyone can read stocks" ON stocks
+-- Group portfolio is public read-only for the app / leaderboard view.
+CREATE POLICY "Anyone can read group portfolio daily" ON public.group_portfolio_daily
   FOR SELECT USING (true);
 
 -- ========================================
--- STEP 2: Enable RLS on all tables
+-- STEP 4: Enable RLS on the new tables
 -- ========================================
 
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE weekly_picks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stock_prices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_portfolio_daily ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_portfolio_daily ENABLE ROW LEVEL SECURITY;
 
 -- ========================================
 -- Verification: Check RLS is enabled
 -- ========================================
 
-SELECT tablename, rowsecurity
+SELECT table_name, rowsecurity
 FROM pg_tables
-WHERE schemaname = 'public';
+WHERE schemaname = 'public'
+  AND table_name IN ('user_portfolio_daily', 'group_portfolio_daily');
 
--- Should show rowsecurity = true for all tables
+-- Should show rowsecurity = true for both tables
 
 -- ========================================
 -- ROLLBACK (if something breaks)
 -- ========================================
 
 -- Uncomment these to disable RLS in an emergency:
--- ALTER TABLE users DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE weekly_picks DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE scores DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE stock_prices DISABLE ROW LEVEL SECURITY;
--- ALTER TABLE stocks DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.user_portfolio_daily DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.group_portfolio_daily DISABLE ROW LEVEL SECURITY;
