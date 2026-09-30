@@ -582,7 +582,7 @@ export default function Home() {
                     dataKey="portfolio_value"
                     stroke="var(--primary)"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: "var(--primary)" }}
+                    dot={false}
                     activeDot={{ r: 5 }}
                   />
                 </LineChart>
