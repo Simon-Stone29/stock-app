@@ -105,6 +105,66 @@ async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<numbe
   }
 }
 
+async function updateBenchmark(today: string, weekStart: string) {
+  try {
+    const openingData = await getActualTradingDay("SPY", weekStart, "after");
+    const currentPrice = await getCurrentPrice("SPY", isSimulationMode() ? today : undefined);
+
+    if (!openingData || openingData.price <= 0 || !currentPrice || currentPrice <= 0) {
+      console.warn(`Skipping SPY benchmark snapshot for ${today}: opening or current price unavailable.`);
+      return;
+    }
+
+    const weeklyReturn = (currentPrice - openingData.price) / openingData.price;
+    const { data: priorWeekRows, error: priorWeekError } = await supabase
+      .from("benchmark_daily")
+      .select("benchmark_value")
+      .lt("week_start", weekStart)
+      .order("snapshot_date", { ascending: false })
+      .limit(1);
+
+    if (priorWeekError) {
+      console.error("Failed to fetch prior weekly benchmark value; using initial value:", priorWeekError);
+    }
+
+    const weekStartValue = Number(priorWeekRows?.[0]?.benchmark_value) || 1000;
+    const benchmarkValue = weekStartValue * (1 + weeklyReturn);
+    const { data: priorDayRows, error: priorDayError } = await supabase
+      .from("benchmark_daily")
+      .select("benchmark_value")
+      .lt("snapshot_date", today)
+      .order("snapshot_date", { ascending: false })
+      .limit(1);
+
+    if (priorDayError) {
+      console.error("Failed to fetch prior daily benchmark value; using weekly return:", priorDayError);
+    }
+
+    const priorDayValue = Number(priorDayRows?.[0]?.benchmark_value);
+    const dailyReturn = Number.isFinite(priorDayValue) && priorDayValue > 0
+      ? benchmarkValue / priorDayValue - 1
+      : weeklyReturn;
+
+    const { error: benchmarkError } = await supabase
+      .from("benchmark_daily")
+      .upsert({
+        snapshot_date: today,
+        week_start: weekStart,
+        symbol: "SPY",
+        benchmark_value: benchmarkValue,
+        daily_return_pct: dailyReturn * 100,
+      }, { onConflict: "snapshot_date" });
+
+    if (benchmarkError) {
+      console.error(`Failed to upsert SPY benchmark snapshot for ${today}:`, benchmarkError);
+    } else {
+      console.log(`SPY benchmark: $${benchmarkValue.toFixed(2)} (${(dailyReturn * 100).toFixed(2)}% daily return)`);
+    }
+  } catch (err) {
+    console.error(`Failed to update SPY benchmark for ${today}:`, err);
+  }
+}
+
 async function main() {
   const referenceDate = getSimulationDate();
   const TODAY = getZonedDateString(referenceDate);
@@ -114,6 +174,8 @@ async function main() {
   console.log(`   Today: ${TODAY}`);
   console.log(`   Current week starts: ${WEEK_START}`);
   if (isSimulationMode()) console.log(`   [SIMULATION MODE]`);
+
+  await updateBenchmark(TODAY, WEEK_START);
 
   // 1. Get all picks for current week
   const { data: picks, error: picksError } = await supabase
