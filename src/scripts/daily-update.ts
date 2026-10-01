@@ -360,17 +360,19 @@ async function main() {
 // This becomes their starting score for the current week.
   const { data: priorScores } = await supabase
     .from("scores")
-    .select("user_id, competence_score, week_start")
+    .select("user_id, portfolio_value, competence_score, week_start")
     .in("user_id", Object.keys(byUser))
     .lt("week_start", WEEK_START)
     .order("score_date", { ascending: false });
 
   const weekStartScoreMap: Record<string, number> = {};
+  const weekStartCompetenceMap: Record<string, number> = {};
 
   priorScores?.forEach(s => {
     // First match per user is their most recent score from a previous week
     if (!(s.user_id in weekStartScoreMap)) {
-      weekStartScoreMap[s.user_id] = s.competence_score;
+      weekStartScoreMap[s.user_id] = s.portfolio_value;
+      weekStartCompetenceMap[s.user_id] = Number(s.competence_score ?? 100);
     }
   });
 
@@ -391,11 +393,14 @@ async function main() {
     // Calculate today's score from the fixed starting score for this week.
     // weeklyReturn is already the total return since Monday.
     const newScore = (1 + weeklyReturn) * weekStartScore;
+    const weekStartCompetence = weekStartCompetenceMap[user_id] ?? 100;
+    const newCompetenceScore = Math.max(0, weekStartCompetence + weeklyReturn * 100);
 
     console.log(`  User ${user_id.substring(0, 8)}:`);
     console.log(`    Weekly return: ${(weeklyReturn * 100).toFixed(2)}%`);
     console.log(`    Week-start score: ${weekStartScore.toFixed(0)}`);
     console.log(`    New score: ${newScore.toFixed(0)}`);
+    console.log(`    Competence score: ${newCompetenceScore.toFixed(2)}`);
     // Upsert weekly score for leaderboard/ranking.
     const { error: scoreError } = await supabase
       .from("scores")
@@ -403,7 +408,8 @@ async function main() {
         user_id,
         score_date: TODAY,      // <--- Primary key component
         week_start: WEEK_START, // <--- Preserved week reference
-        competence_score: newScore,
+        portfolio_value: newScore,
+        competence_score: newCompetenceScore,
       }, { onConflict: "user_id,score_date" });
 
     if (scoreError) {
@@ -486,14 +492,18 @@ async function main() {
           };
         });
 
-        await generateDailyGroupUpdate(
-          WEEK_START,
-          TODAY,
-          newGroupValue,
-          weightedReturn * 100,
-          benchmark,
-          holdings
-        );
+        if (process.env.SIMULATION_SKIP_LLM_OUTPUT === "true") {
+          console.log(`Skipping LLM output for historical simulation date ${TODAY}.`);
+        } else {
+          await generateDailyGroupUpdate(
+            WEEK_START,
+            TODAY,
+            newGroupValue,
+            weightedReturn * 100,
+            benchmark,
+            holdings
+          );
+        }
       }
     }
   } catch (err) {
