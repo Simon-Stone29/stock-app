@@ -158,14 +158,14 @@ export default function Home() {
     const fetchPortfolioHistory = async () => {
       const { data } = await supabase
         .from("scores")
-        .select("score_date, competence_score")
+        .select("score_date, portfolio_value")
         .eq("user_id", user.id)
         .order("score_date", { ascending: true });
 
       setPortfolioHistory(
         (data ?? []).map((row) => ({
           snapshot_date: row.score_date,
-          portfolio_value: Number(row.competence_score),
+          portfolio_value: Number(row.portfolio_value),
         }))
       );
     };
@@ -173,13 +173,13 @@ export default function Home() {
     const fetchPortfolioBalance = async () => {
       const { data } = await supabase
         .from("scores")
-        .select("competence_score")
+        .select("portfolio_value")
         .eq("user_id", user.id)
         .order("score_date", { ascending: false })
         .limit(1)
         .single();
 
-      setPortfolioBalance(data?.competence_score ?? 1000);
+      setPortfolioBalance(data?.portfolio_value ?? 1000);
     };
 
     void fetchPortfolioHistory();
