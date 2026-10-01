@@ -28,7 +28,7 @@ export default function Leaderboard() {
 
         const { data: scores, error: scoresError } = await supabase
           .from("scores")
-          .select("user_id, competence_score, score_date")
+          .select("user_id, portfolio_value, score_date")
           .order("score_date", { ascending: false });
 
         console.log("Scores:", scores, scoresError);
@@ -36,7 +36,7 @@ export default function Leaderboard() {
         const scoreMap: Record<string, number> = {};
         scores?.forEach((score) => {
           if (!scoreMap[score.user_id]) {
-            scoreMap[score.user_id] = score.competence_score;
+            scoreMap[score.user_id] = score.portfolio_value;
           }
         });
 
@@ -46,9 +46,9 @@ export default function Leaderboard() {
           ?.map((user) => ({
             user_id: user.id,
             username: user.username,
-            competence_score: scoreMap[user.id] ?? 1000,
+            portfolio_value: scoreMap[user.id] ?? 1000,
           }))
-          .sort((a, b) => b.competence_score - a.competence_score);
+          .sort((a, b) => b.portfolio_value - a.portfolio_value);
 
         setLeaderboard(combined || []);
       } catch (err) {
@@ -88,7 +88,7 @@ export default function Leaderboard() {
           {leaderboard.map((entry, index) => {
             const rank = index + 1;
             const topThree = rank <= 3;
-            const balance = entry.competence_score;
+            const balance = entry.portfolio_value;
             const totalGained = balance - 1000;
             return (
                 <div
