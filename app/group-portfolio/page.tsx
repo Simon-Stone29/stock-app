@@ -13,11 +13,16 @@ import {
 import { supabase } from "@/src/lib/supabase";
 import { Card, CardHeader, CardTitle, CardContent } from "@/src/components/ui/card";
 import { cn } from "@/src/lib/utils";
+import { getZonedDateString } from "@/src/lib/weekDates";
 
 export default function GroupPortfolio() {
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [stocks, setStocks] = useState<any>({});
   const [weekStart, setWeekStart] = useState<string>("");
+  const [outputDate, setOutputDate] = useState<string>("");
+  const [dailyOutput, setDailyOutput] = useState<string | null>(null);
+  const [dailyOutputLoading, setDailyOutputLoading] = useState(true);
+  const [dailyOutputError, setDailyOutputError] = useState(false);
   const [groupPerformance, setGroupPerformance] = useState<number | null>(null);
   const [groupPortfolioValue, setGroupPortfolioValue] = useState<number>(1000);
   const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
@@ -26,8 +31,45 @@ export default function GroupPortfolio() {
   useEffect(() => {
     fetch("/api/time-context")
       .then((res) => res.json())
-      .then((data) => setWeekStart(data.weekStart));
+      .then((data) => {
+        setWeekStart(data.weekStart);
+        setOutputDate(getZonedDateString(new Date(data.currentTime)));
+      })
+      .catch((error) => {
+        console.error("Failed to load time context for daily group update:", error);
+        setDailyOutputError(true);
+        setDailyOutputLoading(false);
+      });
   }, []);
+
+  useEffect(() => {
+    if (!weekStart || !outputDate) return;
+
+    let cancelled = false;
+    const fetchDailyOutput = async () => {
+      setDailyOutputLoading(true);
+      const { data, error } = await supabase
+        .from("llm_output")
+        .select("output")
+        .eq("week_start", weekStart)
+        .eq("output_date", outputDate)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load daily group update:", error);
+        setDailyOutputError(true);
+      } else {
+        setDailyOutput(data?.output ?? null);
+      }
+      setDailyOutputLoading(false);
+    };
+
+    void fetchDailyOutput();
+    return () => {
+      cancelled = true;
+    };
+  }, [weekStart, outputDate]);
 
   useEffect(() => {
     if (!weekStart) return;
@@ -156,6 +198,19 @@ export default function GroupPortfolio() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold tracking-tight">Group Portfolio</h1>
+
+      <section className="mb-8 border-l-2 border-primary pl-4">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Daily group update{outputDate ? ` · ${outputDate}` : ""}
+        </div>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+          {dailyOutputLoading
+            ? "Loading today's update..."
+            : dailyOutputError
+            ? "Couldn't load today's update."
+            : dailyOutput ?? "No update has been generated for today yet."}
+        </p>
+      </section>
 
       <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-2">
         <div className="md:border-r md:border-border md:pr-8">
