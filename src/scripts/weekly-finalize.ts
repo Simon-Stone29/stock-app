@@ -213,9 +213,10 @@ async function main() {
   const userIds = [...new Set(picks.map(p => p.user_id))];
   const { data: latestScores } = await supabase
     .from("scores")
-    .select("user_id, competence_score")
+    .select("user_id, competence_score, score_date")
     .in("user_id", userIds)
-    .order("week_start", { ascending: false });
+    .lt("week_start", WEEK_START)
+    .order("score_date", { ascending: false });
 
   const scoreMap: Record<string, number> = {};
   latestScores?.forEach(s => {
