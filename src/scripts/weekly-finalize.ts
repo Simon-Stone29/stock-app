@@ -219,22 +219,30 @@ async function main() {
 
   const scoreMap: Record<string, number> = {};
   latestScores?.forEach(s => {
-    if (!scoreMap[s.user_id]) scoreMap[s.user_id] = s.competence_score;
+    if (!(s.user_id in scoreMap)) scoreMap[s.user_id] = Number(s.competence_score);
   });
 
   // Calculate max score for normalization
-  const maxScore = Math.max(...Object.values(scoreMap), 1000);
+  const maxScore = Math.max(...Object.values(scoreMap), 100);
   const contributions: Record<string, number> = {};
 
   // Weight each pick by user's normalized score
   for (const pick of picks) {
-    const userScore = scoreMap[pick.user_id] ?? 1000;
+    const userScore = scoreMap[pick.user_id] ?? 100;
     const normalized = userScore / maxScore;
     const contribution = normalized * (pick.percentage || 0);
     contributions[pick.symbol] = (contributions[pick.symbol] || 0) + contribution;
   }
 
-  const totalContribution = Object.values(contributions).reduce((a, b) => a + b, 0);
+  let totalContribution = Object.values(contributions).reduce((a, b) => a + b, 0);
+
+  if (totalContribution === 0) {
+    console.warn("All competence scores are zero; falling back to submitted pick weights.");
+    for (const pick of picks) {
+      contributions[pick.symbol] = (contributions[pick.symbol] || 0) + (pick.percentage || 0);
+    }
+    totalContribution = Object.values(contributions).reduce((a, b) => a + b, 0);
+  }
 
   // Convert to percentages and store in database
   const portfolioEntries = Object.entries(contributions)
