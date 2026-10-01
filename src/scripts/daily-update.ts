@@ -1,4 +1,5 @@
 import YahooFinance from "yahoo-finance2";
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
 import * as dotenv from "dotenv";
@@ -15,6 +16,21 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const DAILY_GROUP_PROMPT =  `
+  You are an executive summary writer for a group portfolio dashboard.
+  Generate a concise daily performance update (2 to 3 sentences maximum).
+
+  STRICT FORMATTING RULES:
+  1. Return ONLY pure prose text. 
+  2. Do NOT use title headers, markdown headings (e.g. # or ##), bullet points, bold labels, or section intros.
+  3. Keep the tone professional, direct, and analytical.
+
+  REQUIRED CONTENT (Cover in order):
+  1. Portfolio Sentiment/Theme: Summarize the overarching investment theme or sentiment of the portfolio picks for this week (e.g., "bullish on big tech", "defensively positioned in blue-chips") without explicitly listing individual stock percentage breakdowns.
+  2. Week-to-Date (WTD) Performance: State the group's week-to-date return percentage and total portfolio value.
+  3. Benchmark Comparison: Compare the group's week-to-date return against SPY's when benchmark data is available. The benchmark index value is normalized, not SPY's share price. If benchmark data is unavailable, say so without guessing.
+  `;
 
 /**
  * DAILY UPDATE SCRIPT
@@ -105,14 +121,56 @@ async function getCurrentPrice(symbol: string, asOfDate?: string): Promise<numbe
   }
 }
 
-async function updateBenchmark(today: string, weekStart: string) {
+async function generateDailyGroupUpdate(
+  weekStart: string,
+  outputDate: string,
+  groupValue: number,
+  weeklyReturnPct: number,
+  benchmark: { symbol: "SPY"; indexValue: number; weeklyReturnPct: number; dailyReturnPct: number } | null,
+  holdings: { symbol: string; allocationPct: number; openPrice: number | null; currentPrice: number | null; returnPct: number | null }[]
+) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log("GEMINI_API_KEY is not set; skipping the daily group update.");
+    return;
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.interactions.create({
+      model: "gemini-3.8-flash",
+      input: `${DAILY_GROUP_PROMPT}\n\n${JSON.stringify({ weekStart, outputDate, groupValue, weeklyReturnPct, benchmark, holdings })}`,
+      store: false,
+    });
+    const output = response.output_text?.trim();
+
+    if (!output) {
+      console.warn("Gemini returned an empty daily group update.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("llm_output")
+      .upsert({ week_start: weekStart, output_date: outputDate, output }, { onConflict: "week_start,output_date" });
+
+    if (error) throw error;
+    console.log(`Saved daily group update to llm_output for ${outputDate}.`);
+  } catch (error) {
+    console.warn("Could not generate or save the daily group update; continuing daily update.", error);
+  }
+}
+
+async function updateBenchmark(
+  today: string,
+  weekStart: string
+): Promise<{ symbol: "SPY"; indexValue: number; weeklyReturnPct: number; dailyReturnPct: number } | null> {
   try {
     const openingData = await getActualTradingDay("SPY", weekStart, "after");
     const currentPrice = await getCurrentPrice("SPY", isSimulationMode() ? today : undefined);
 
     if (!openingData || openingData.price <= 0 || !currentPrice || currentPrice <= 0) {
       console.warn(`Skipping SPY benchmark snapshot for ${today}: opening or current price unavailable.`);
-      return;
+      return null;
     }
 
     const weeklyReturn = (currentPrice - openingData.price) / openingData.price;
@@ -157,11 +215,19 @@ async function updateBenchmark(today: string, weekStart: string) {
 
     if (benchmarkError) {
       console.error(`Failed to upsert SPY benchmark snapshot for ${today}:`, benchmarkError);
+      return null;
     } else {
       console.log(`SPY benchmark: $${benchmarkValue.toFixed(2)} (${(dailyReturn * 100).toFixed(2)}% daily return)`);
+      return {
+        symbol: "SPY",
+        indexValue: benchmarkValue,
+        weeklyReturnPct: weeklyReturn * 100,
+        dailyReturnPct: dailyReturn * 100,
+      };
     }
   } catch (err) {
     console.error(`Failed to update SPY benchmark for ${today}:`, err);
+    return null;
   }
 }
 
@@ -175,7 +241,7 @@ async function main() {
   console.log(`   Current week starts: ${WEEK_START}`);
   if (isSimulationMode()) console.log(`   [SIMULATION MODE]`);
 
-  await updateBenchmark(TODAY, WEEK_START);
+  const benchmark = await updateBenchmark(TODAY, WEEK_START);
 
   // 1. Get all picks for current week
   const { data: picks, error: picksError } = await supabase
@@ -404,6 +470,30 @@ async function main() {
         if (groupDailyError) {
           console.error("🧪 Daily update debug: failed to upsert group portfolio snapshot", { groupDailyError });
         }
+
+        const holdings = weeklyPortfolio.map((row) => {
+          const prices = priceMap[row.symbol];
+          const openPrice = prices?.open ?? null;
+          const currentPrice = prices?.close ?? null;
+          return {
+            symbol: row.symbol,
+            allocationPct: Number(row.percentage) || 0,
+            openPrice,
+            currentPrice,
+            returnPct: openPrice && currentPrice !== null
+              ? ((currentPrice - openPrice) / openPrice) * 100
+              : null,
+          };
+        });
+
+        await generateDailyGroupUpdate(
+          WEEK_START,
+          TODAY,
+          newGroupValue,
+          weightedReturn * 100,
+          benchmark,
+          holdings
+        );
       }
     }
   } catch (err) {
