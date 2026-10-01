@@ -6,4 +6,5 @@ DELETE FROM group_portfolio_daily;
 DELETE FROM weekly_portfolio;
 DELETE FROM stock_prices;
 DELETE FROM weekly_picks;
-delete from benchmark_daily;
+DELETE FROM benchmark_daily;
+DELETE FROM llm_output;
