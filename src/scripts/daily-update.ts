@@ -492,18 +492,14 @@ async function main() {
           };
         });
 
-        if (process.env.SIMULATION_SKIP_LLM_OUTPUT === "true") {
-          console.log(`Skipping LLM output for historical simulation date ${TODAY}.`);
-        } else {
-          await generateDailyGroupUpdate(
-            WEEK_START,
-            TODAY,
-            newGroupValue,
-            weightedReturn * 100,
-            benchmark,
-            holdings
-          );
-        }
+        await generateDailyGroupUpdate(
+          WEEK_START,
+          TODAY,
+          newGroupValue,
+          weightedReturn * 100,
+          benchmark,
+          holdings
+        );
       }
     }
   } catch (err) {

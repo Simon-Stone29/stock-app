@@ -18,25 +18,25 @@ import * as path from "path";
 
 const SIMULATION_WEEKS = [
   {
-    monday:  "2025-05-05",
-    friday:  "2025-05-09",
-    trading: ["2025-05-05", "2025-05-06", "2025-05-07", "2025-05-08", "2025-05-09"],
+    monday: "2026-09-07",
+    through: "2026-09-11",
+    // September 7 is Labor Day; the market is closed.
+    trading: ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11"],
   },
   {
-    monday:  "2025-05-12",
-    friday:  "2025-05-16",
-    trading: ["2025-05-12", "2025-05-13", "2025-05-14", "2025-05-15", "2025-05-16"],
+    monday: "2026-09-14",
+    through: "2026-09-18",
+    trading: ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"],
   },
   {
-    monday:  "2025-05-19",
-    friday:  "2025-05-23",
-    trading: ["2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23"],
+    monday: "2026-09-21",
+    through: "2026-09-25",
+    trading: ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"],
   },
   {
-    monday:  "2025-05-26",
-    friday:  "2025-05-30",
-    // May 26 is Memorial Day — market closed, first trading day is May 27
-    trading: ["2025-05-27", "2025-05-28", "2025-05-29", "2025-05-30"],
+    monday: "2026-09-28",
+    through: "2026-10-01",
+    trading: ["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01"],
   },
 ];
 
@@ -143,7 +143,7 @@ async function main() {
 
   for (const week of SIMULATION_WEEKS) {
     console.log(`\n${"─".repeat(60)}`);
-    console.log(`📅 Week of ${week.monday} → ${week.friday}`);
+    console.log(`📅 Week of ${week.monday} → ${week.through}`);
     console.log(`${"─".repeat(60)}`);
 
     // ── Monday 4am ET: weekly finalize (builds group portfolio, opening prices) ──
