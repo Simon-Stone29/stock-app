@@ -8,6 +8,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Legend,
 } from "recharts";
 import { supabase } from "@/src/lib/supabase";
 import { getLastMonday, getNextMonday, getPreviousMonday, isVotingOpen } from "@/src/lib/weekDates";
@@ -42,6 +43,7 @@ export default function Home() {
   const [lastWeekGain, setLastWeekGain] = useState<number | null>(null);
   const [currentWeekGain, setCurrentWeekGain] = useState<number | null>(null);
   const [portfolioHistory, setPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
+  const [groupPortfolioHistory, setGroupPortfolioHistory] = useState<{ snapshot_date: string; portfolio_value: number }[]>([]);
   const [serverTime, setServerTime] = useState<any>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [portfolioBalance, setPortfolioBalance] = useState<number>(1000);
@@ -183,6 +185,24 @@ export default function Home() {
     void fetchPortfolioHistory();
     void fetchPortfolioBalance();
   }, [user]);
+
+  useEffect(() => {
+    const fetchSharedHistory = async () => {
+      const { data, error } = await supabase
+        .from("group_portfolio_daily")
+        .select("snapshot_date, portfolio_value")
+        .order("snapshot_date", { ascending: true });
+
+      if (error) console.error("Failed to load group portfolio history:", error);
+
+      setGroupPortfolioHistory((data ?? []).map((row) => ({
+        snapshot_date: row.snapshot_date,
+        portfolio_value: Number(row.portfolio_value),
+      })));
+    };
+
+    void fetchSharedHistory();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -362,6 +382,18 @@ export default function Home() {
 
     alert("Picks submitted!");
   };
+
+  const individualValuesByDate = new Map(portfolioHistory.map((row) => [row.snapshot_date, row.portfolio_value]));
+  const groupValuesByDate = new Map(groupPortfolioHistory.map((row) => [row.snapshot_date, row.portfolio_value]));
+  const chartDates = Array.from(new Set([
+    ...portfolioHistory.map((row) => row.snapshot_date),
+    ...groupPortfolioHistory.map((row) => row.snapshot_date),
+  ])).sort();
+  const comparisonHistory = chartDates.map((snapshot_date) => ({
+    snapshot_date,
+    individual_value: individualValuesByDate.get(snapshot_date) ?? null,
+    group_value: groupValuesByDate.get(snapshot_date) ?? null,
+  }));
 
   if (!user) {
     return (
@@ -549,10 +581,10 @@ export default function Home() {
           <CardTitle>Portfolio performance</CardTitle>
         </CardHeader>
         <CardContent>
-          {portfolioHistory.length > 0 ? (
+          {comparisonHistory.length > 0 ? (
             <div style={{ width: "100%", height: 260 }}>
               <ResponsiveContainer>
-                <LineChart data={portfolioHistory} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
+                <LineChart data={comparisonHistory} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="snapshot_date"
@@ -574,16 +606,29 @@ export default function Home() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(value) => [`$${Number(value ?? 0).toFixed(2)}`, "Portfolio value"]}
+                    formatter={(value, name) => [`$${Number(value ?? 0).toFixed(2)}`, String(name)]}
                     labelFormatter={(label) => String(label)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="individual_value"
+                    name="Individual"
+                     stroke="#ffdd47"
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    connectNulls
                   />
                   <Line
                     type="monotone"
-                    dataKey="portfolio_value"
+                    dataKey="group_value"
+                    name="Group"
                     stroke="var(--primary)"
                     strokeWidth={2.5}
                     dot={false}
                     activeDot={{ r: 5 }}
+                    connectNulls
                   />
                 </LineChart>
               </ResponsiveContainer>
