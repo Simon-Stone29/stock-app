@@ -24,7 +24,7 @@ export function AppNavbar() {
             Alpha<span className="text-primary">Pool</span>
           </span>
           <Image
-            src="/alphapoollogo.png"
+            src="/alphapoollogo2.png"
             alt=""
             width={25}
             height={25}
