@@ -5,6 +5,9 @@ import { FirstVisitRedirect } from "@/src/components/FirstVisitRedirect";
 
 export const metadata: Metadata = {
   title: "AlphaPool",
+  icons: {
+    icon: "/alphapoollogo2.png",
+  },
 };
 
 export default function RootLayout({
