@@ -74,27 +74,23 @@ const steps = [
 ];
 
 export default function About() {
+  const [showWave, setShowWave] = useState(true);
+
   return (
     <div>
-      {/* Hero */}
-      <section className="mx-auto flex min-h-[90vh] max-w-3xl flex-col justify-center px-4">
-        <span className="text-sm font-semibold uppercase tracking-widest text-foreground">
-          Alpha<span className="text-primary">Pool</span>
-        </span>
-        <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
-          Beat the group,{" "}
-          <span className="text-muted-foreground">track your stocks</span>, &amp;
-          contribute to a <span className="text-primary">merit-based</span>{" "}
-          collective portfolio.
-        </h1>
-
-        <div className="mt-12 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex h-8 w-5 items-start justify-center rounded-full border border-border pt-1.5">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
-          </span>
-          Scroll
-        </div>
-      </section>
+      {showWave && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          aria-hidden="true"
+          onEnded={() => setShowWave(false)}
+          className="pointer-events-none fixed inset-0 z-30 h-dvh w-full object-cover mix-blend-screen"
+        >
+          <source src="/wave_transparent.webm" type="video/webm" />
+        </video>
+      )}
 
       {/* How it works */}
       <section className="mx-auto max-w-2xl px-4 py-24">
