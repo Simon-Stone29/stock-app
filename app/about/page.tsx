@@ -78,8 +78,8 @@ export default function About() {
     <div>
       {/* Hero */}
       <section className="mx-auto flex min-h-[90vh] max-w-3xl flex-col justify-center px-4">
-        <span className="text-sm font-semibold uppercase tracking-widest text-primary">
-          AlphaPool
+        <span className="text-sm font-semibold uppercase tracking-widest text-foreground">
+          Alpha<span className="text-primary">Pool</span>
         </span>
         <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
           Beat the group,{" "}

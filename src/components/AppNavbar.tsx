@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/src/lib/utils";
 
@@ -18,8 +19,17 @@ export function AppNavbar() {
   return (
     <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-full items-center justify-between px-4">
-        <Link href="/" className="text-xl font-semibold tracking-wide">
-          Alpha<span className="text-primary">Pool</span>
+        <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide">
+          <span>
+            Alpha<span className="text-primary">Pool</span>
+          </span>
+          <Image
+            src="/alphapoollogo.png"
+            alt=""
+            width={25}
+            height={25}
+            className="h-[25px] w-[25px] object-contain"
+          />
         </Link>
         
         {/* Desktop Nav */}
