@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/src/components/ui/button";
 import { cn } from "@/src/lib/utils";
 
@@ -77,7 +78,7 @@ export default function About() {
   const [showWave, setShowWave] = useState(true);
 
   return (
-    <div>
+    <div className="about-page">
       {showWave && (
         <video
           autoPlay
@@ -93,27 +94,41 @@ export default function About() {
       )}
 
       {/* How it works */}
-      <section className="mx-auto max-w-2xl px-4 py-24">
-        <Reveal>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            How it works
-          </h2>
-        </Reveal>
-
-        <div className="mt-8 space-y-16">
-          {steps.map((step) => (
-            <Reveal key={step.number} className="flex gap-6">
-              <span className="tabular-nums text-sm font-semibold text-primary">
-                {step.number}
-              </span>
-              <div>
-                <h3 className="text-lg font-semibold">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {step.description}
-                </p>
-              </div>
+      <section className="mx-auto max-w-6xl px-4 py-24">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:items-center lg:gap-16">
+          <div>
+            <Reveal>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                How it works
+              </h2>
             </Reveal>
-          ))}
+
+            <div className="mt-8 space-y-16">
+              {steps.map((step) => (
+                <Reveal key={step.number} className="flex gap-6">
+                  <span className="tabular-nums text-sm font-semibold text-primary">
+                    {step.number}
+                  </span>
+                  <div>
+                    <h3 className="text-lg font-semibold">{step.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {step.description}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+
+          <Reveal className="relative mx-auto h-[min(70svh,44rem)] min-h-80 w-full max-w-lg overflow-hidden rounded-lg lg:mt-0">
+            <Image
+              src="/alphapool_phone.png"
+              alt="AlphaPool portfolio displayed on a phone"
+              fill
+              sizes="(min-width: 1024px) 40vw, 100vw"
+              className="object-cover"
+            />
+          </Reveal>
         </div>
       </section>
 
