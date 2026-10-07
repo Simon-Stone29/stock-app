@@ -78,7 +78,7 @@ export default function About() {
   const [showWave, setShowWave] = useState(true);
 
   return (
-    <div className="about-page">
+    <div>
       {showWave && (
         <video
           autoPlay
