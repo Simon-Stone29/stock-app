@@ -76,6 +76,12 @@ const steps = [
 
 export default function About() {
   const [showWave, setShowWave] = useState(true);
+  const [showContent, setShowContent] = useState(false);
+
+  const finishSplash = () => {
+    setShowContent(true);
+    setShowWave(false);
+  };
 
   return (
     <div>
@@ -86,16 +92,28 @@ export default function About() {
           playsInline
           preload="auto"
           aria-hidden="true"
-          onEnded={() => setShowWave(false)}
+          onTimeUpdate={(event) => {
+            const video = event.currentTarget;
+            if (
+              Number.isFinite(video.duration) &&
+              video.duration > 0 &&
+              video.currentTime >= video.duration - 0.6
+            ) {
+              setShowContent(true);
+            }
+          }}
+          onEnded={finishSplash}
+          onError={finishSplash}
           className="pointer-events-none fixed inset-0 z-30 h-dvh w-full object-cover mix-blend-screen"
         >
           <source src="/wave_transparent.webm" type="video/webm" />
         </video>
       )}
 
+      <div className={showContent ? "block" : "hidden"}>
       {/* How it works */}
-      <section className="mx-auto max-w-6xl px-4 py-24">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
+      <section className="mx-auto max-w-5xl px-4 py-24 md:pl-12">
+        <div className="grid gap-12 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] md:items-center">
           <div>
             <Reveal>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -120,14 +138,14 @@ export default function About() {
             </div>
           </div>
 
-          <Reveal className="relative mx-auto h-[min(84svh,52.8rem)] min-h-96 w-full max-w-[38.4rem] overflow-hidden rounded-lg lg:mt-0">
+          <Reveal className="relative z-10 mx-auto h-[min(84svh,52.8rem)] min-h-96 w-full max-w-[38.4rem] overflow-visible rounded-lg md:translate-x-[calc(15vw-7rem)] xl:translate-x-[calc(15vw-4rem)] lg:mt-0">
             <Image
               src="/alphapool_phone.png"
               alt="AlphaPool portfolio displayed on a phone"
               fill
               unoptimized
               sizes="(min-width: 1024px) 40vw, 100vw"
-              className="object-cover"
+              className="object-contain scale-150"
             />
           </Reveal>
         </div>
@@ -142,6 +160,7 @@ export default function About() {
           <Button className="mt-6">Get started</Button>
         </Link>
       </Reveal>
+      </div>
     </div>
   );
 }
