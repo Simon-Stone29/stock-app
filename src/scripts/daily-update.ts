@@ -56,11 +56,14 @@ async function getActualTradingDay(
     const end = new Date(targetDate);
     end.setDate(end.getDate() + 14);
 
-    const historical = await yahooFinance.historical(symbol, {
-      period1: start,
-      period2: end,
-      interval: "1d",
-    });
+    const chartData = await yahooFinance.chart(
+      symbol,
+      { period1: start, period2: end, interval: "1d" },
+      { validateResult: false }
+    ) as {
+      quotes?: Array<{ date: Date; open: number | null; close: number | null }>;
+    };
+    const historical = chartData.quotes ?? [];
 
     if (!historical.length) return null;
 
@@ -74,11 +77,10 @@ async function getActualTradingDay(
       });
       const result = matching[matching.length - 1];
       if (!result) return null;
+      if (typeof result.close !== "number" || !Number.isFinite(result.close)) return null;
 
       return {
-        date: result.date instanceof Date
-          ? result.date.toISOString().split("T")[0]
-          : result.date,
+        date: result.date.toISOString().split("T")[0],
         price: result.close
       };
     } else {
@@ -90,11 +92,10 @@ async function getActualTradingDay(
         return barDate >= targetDate;
       });
       if (!matching) return null;
+      if (typeof matching.open !== "number" || !Number.isFinite(matching.open)) return null;
 
       return {
-        date: matching.date instanceof Date
-          ? matching.date.toISOString().split("T")[0]
-          : matching.date,
+        date: matching.date.toISOString().split("T")[0],
         price: matching.open
       };
     }
