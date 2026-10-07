@@ -125,6 +125,7 @@ export default function About() {
               src="/alphapool_phone.png"
               alt="AlphaPool portfolio displayed on a phone"
               fill
+              unoptimized
               sizes="(min-width: 1024px) 40vw, 100vw"
               className="object-cover"
             />
