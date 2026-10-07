@@ -95,7 +95,7 @@ export default function About() {
 
       {/* How it works */}
       <section className="mx-auto max-w-6xl px-4 py-24">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:items-center lg:gap-16">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
           <div>
             <Reveal>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -120,7 +120,7 @@ export default function About() {
             </div>
           </div>
 
-          <Reveal className="relative mx-auto h-[min(70svh,44rem)] min-h-80 w-full max-w-lg overflow-hidden rounded-lg lg:mt-0">
+          <Reveal className="relative mx-auto h-[min(84svh,52.8rem)] min-h-96 w-full max-w-[38.4rem] overflow-hidden rounded-lg lg:mt-0">
             <Image
               src="/alphapool_phone.png"
               alt="AlphaPool portfolio displayed on a phone"
