@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AlphaPool
 
-## Getting Started
+AlphaPool is a stock-picking competition. Users allocate a virtual portfolio to stocks each week, track performance against the week's opening prices, and contribute to a shared portfolio whose allocations are weighted by users' competence scores.
 
-First, run the development server:
+## Get started
+
+### Requirements
+
+- Node.js 22 (the scheduled GitHub Actions workflows use Node 22)
+- npm
+- A Supabase project with the tables and policies used by the app and scripts
+
+### Install and run
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create `.env.local` in the project root. The browser app needs:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```text
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
-## Learn More
+The scheduled scripts also need:
 
-To learn more about Next.js, take a look at the following resources:
+```text
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`GEMINI_API_KEY` is optional and enables the daily group-portfolio summary. Never expose the service-role key in client-side code or commit secrets. See [Supabase RLS setup](./supabase/RLS-SETUP-INSTRUCTIONS.md) before configuring database access.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Where the logic lives
 
-## Deploy on Vercel
+### App routes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| File | Responsibility |
+| --- | --- |
+| `app/page.tsx` | Main “My Picks” experience: authentication state, stock picks, individual portfolio performance, and history. |
+| `app/group-portfolio/page.tsx` | Shared portfolio allocations, performance history, benchmark history, and the generated daily summary. |
+| `app/leaderboard/page.tsx` | User rankings and latest portfolio values. |
+| `app/about/page.tsx` | Product overview and how the weekly competition works. |
+| `app/api/time-context/route.ts` | Supplies the current app time, week start, and voting status to the browser. |
+| `app/layout.tsx` | Shared page layout, navigation, metadata, and global styles. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Shared code
+
+| File | Responsibility |
+| --- | --- |
+| `src/lib/weekDates.ts` | Shared New York timezone, week-boundary, and voting-window calculations. Use this rather than local-machine date methods for competition timing. |
+| `src/lib/supabase.ts` | Browser Supabase client, using the public anon key. |
+| `src/lib/supabase-server.ts` | Server Supabase client setup. |
+| `src/lib/utils.ts` | Shared UI utility functions. |
+| `src/config/simulation.ts` | Simulation date switch used by app timing and scheduled scripts. |
+| `src/components/` | Navigation, first-visit handling, username setup, and reusable UI components. |
+
+### Background jobs and database
+
+| File | Responsibility |
+| --- | --- |
+| `src/scripts/daily-update.ts` | Fetches current or simulated stock prices, updates daily user scores and group snapshots, and optionally generates the group summary. |
+| `src/scripts/weekly-finalize.ts` | Initializes weekly prices and calculates the next shared portfolio using users' competence-weighted picks. |
+| `src/scripts/run-simulation.ts` | Runs the weekly and daily scripts across configured historical dates. |
+| `.github/workflows/daily-update.yml` | Scheduled/manual GitHub Actions workflow for the daily update. |
+| `.github/workflows/weekly-finalize.yml` | Scheduled/manual GitHub Actions workflow for weekly finalization. |
+| `supabase/` | SQL setup, seed, cleanup, and migration files. |
+
+
+## Scheduled jobs
+
+GitHub Actions runs the daily update on weekdays and weekly finalization on Mondays; both workflows can also be started manually. Add the following repository Actions secrets for the scheduled jobs:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `GEMINI_API_KEY` (optional; used by the daily update)
+
+The app also requires `NEXT_PUBLIC_SUPABASE_ANON_KEY` locally. Keep private keys in environment variables and configure production app environment variables in the deployment platform.
