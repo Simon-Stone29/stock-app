@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AlphaPool
 
 AlphaPool is a stock-picking competition. Users allocate a virtual portfolio to stocks each week, track performance against the week's opening prices, and contribute to a shared portfolio whose allocations are weighted by users' competence scores.
@@ -79,3 +80,6 @@ GitHub Actions runs the daily update on weekdays and weekly finalization on Mond
 - `GEMINI_API_KEY` (optional; used by the daily update)
 
 The app also requires `NEXT_PUBLIC_SUPABASE_ANON_KEY` locally. Keep private keys in environment variables and configure production app environment variables in the deployment platform.
+=======
+
+>>>>>>> eb623ef525ed5d24dac3ea7197b3901d38b0215d
